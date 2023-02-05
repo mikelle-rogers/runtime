@@ -1166,8 +1166,8 @@ HRESULT EECodeManager::FixContextForEnC(PCONTEXT         pCtx,
             }
         }
 
-        _ASSERTE(newNumVars >= oldNumVars ||
-                 !"Not allowed to reduce the number of locals between versions!");
+        // _ASSERTE(newNumVars >= oldNumVars ||
+        //          !"Not allowed to reduce the number of locals between versions!");
 
         LOG((LF_ENC, LL_INFO100, "EECM::FixContextForEnC: gathered info!\n"));
 

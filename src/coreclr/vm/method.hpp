@@ -1688,17 +1688,16 @@ protected:
 
     // The slot number of this MethodDesc in the vtable array.
     // Note that we may store other information in the high bits if available --
-    // see enum_packedSlotLayout and mdcRequiresFullSlotNumber for details.
-    WORD m_wSlotNumber;
-
-    enum {
+    // see enum_packedSlotLayout_* and mdcRequiresFullSlotNumber for details.
+    enum
+    {
         enum_packedSlotLayout_SlotMask      = 0x03FF,
         enum_packedSlotLayout_NameHashMask  = 0xFC00
     };
+    WORD m_wSlotNumber;
 
+    // See MethodDescClassification for values.
     WORD m_wFlags;
-
-
 
 public:
 #ifdef DACCESS_COMPILE
@@ -3424,15 +3423,6 @@ public:
     void SetupWrapperStubWithInstantiations(MethodDesc* wrappedMD,DWORD numGenericArgs, TypeHandle *pGenericMethodInst);
 
 private:
-    enum
-    {
-        KindMask                            = 0x07,
-        GenericMethodDefinition             = 0x00,
-        UnsharedMethodInstantiation         = 0x01,
-        SharedMethodInstantiation           = 0x02,
-        WrapperStubWithInstantiations       = 0x03,
-    };
-
     friend class MethodDesc; // this fields are currently accessed by MethodDesc::Save/Restore etc.
     union {
         PTR_DictionaryLayout m_pDictLayout; //SharedMethodInstantiation
@@ -3453,6 +3443,14 @@ public: // <TODO>make private: JITinterface.cpp accesses through this </TODO>
     PTR_Dictionary m_pPerInstInfo;  //SHARED
 
 private:
+    enum
+    {
+        KindMask                        = 0x07,
+        GenericMethodDefinition         = 0x01,
+        UnsharedMethodInstantiation     = 0x02,
+        SharedMethodInstantiation       = 0x03,
+        WrapperStubWithInstantiations   = 0x04,
+    };
     WORD          m_wFlags2;
     WORD          m_wNumGenericArgs;
 

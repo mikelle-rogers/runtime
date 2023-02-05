@@ -577,34 +577,38 @@ HRESULT EEClass::AddMethod(MethodTable * pMT, mdMethodDef methodDef, RVA newRVA,
     }
 #endif // _DEBUG
 
-    EEClass * pClass = pMT->GetClass();
+    LoaderAllocator* pAllocator = pMT->GetLoaderAllocator();
 
-    // @todo: OOM: InitMethodDesc will allocate loaderheap memory but leak it
+    // Check if signature is generic.
+    ULONG sigLen;
+    PCCOR_SIGNATURE sig;
+    IfFailThrow(pImport->GetSigOfMethodDef(methodDef, &sigLen, &sig));
+    uint32_t callConv = CorSigUncompressData(sig);
+    DWORD classification = (callConv & IMAGE_CEE_CS_CALLCONV_GENERIC)
+        ? mcInstantiated
+        : mcIL;
+
+    // [TODO] OOM: InitMethodDesc will allocate loaderheap memory but leak it
     //   on failure. This AllocMemTracker should be replaced with a real one.
     AllocMemTracker dummyAmTracker;
 
-    LoaderAllocator* pAllocator = pMT->GetLoaderAllocator();
-
-    DWORD classification = mcIL;
-
-    // Create a new MethodDescChunk to hold the new MethodDesc
-    // Create the chunk somewhere we'll know is within range of the VTable
+    // Create a new MethodDescChunk to hold the new MethodDesc.
+    // Create the chunk somewhere we'll know is within range of the VTable.
     MethodDescChunk *pChunk = MethodDescChunk::CreateChunk(pAllocator->GetHighFrequencyHeap(),
-                                                           1,               // methodDescCount
+                                                           1,   // methodDescCount
                                                            classification,
-                                                           TRUE /* fNonVtableSlot */,
-                                                           TRUE /* fNativeCodeSlot */,
+                                                           TRUE, // fNonVtableSlot
+                                                           TRUE, // fNativeCodeSlot
                                                            pMT,
                                                            &dummyAmTracker);
 
     // Get the new MethodDesc (Note: The method desc memory is zero initialized)
     MethodDesc *pNewMD = pChunk->GetFirstMethodDesc();
 
+    EEClass* pClass = pMT->GetClass();
 
-    // Initialize the new MethodDesc
-
-     // This method runs on a debugger thread. Debugger threads do not have Thread object that caches StackingAllocator.
-     // Use a local StackingAllocator instead.
+     // This method runs on a debugger thread. Debugger threads do not have Thread object
+     // that caches StackingAllocator, use a local StackingAllocator instead.
     StackingAllocator stackingAllocator;
 
     MethodTableBuilder::bmtInternalInfo bmtInternal;
@@ -629,6 +633,7 @@ HRESULT EEClass::AddMethod(MethodTable * pMT, mdMethodDef methodDef, RVA newRVA,
                        NULL,
                        &bmtInternal);
 
+    // Initialize the new MethodDesc
     EX_TRY
     {
         INDEBUG(LPCSTR debug_szFieldName);
