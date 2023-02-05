@@ -8073,6 +8073,7 @@ namespace
             MODE_ANY;
             PRECONDITION(pDefMD != NULL);
             PRECONDITION(pDefMD->IsEnCAddedMethod());
+            PRECONDITION(pDefMD->GetSlot() == MethodTable::NO_SLOT);
         }
         CONTRACTL_END;
 
