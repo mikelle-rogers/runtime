@@ -8076,11 +8076,11 @@ namespace
         }
         CONTRACTL_END;
 
-        MethodTable::IntroducedMethodIterator it(pDefMD->GetMethodTable());
-
         mdMethodDef tkMethod = pDefMD->GetMemberDef();
         mdFile tkModule = pDefMD->GetModule()->GetModuleRef();
         LOG((LF_ENC, LL_INFO100, "GPMDENC: %x %x\n", tkMethod, tkModule));
+
+        MethodTable::IntroducedMethodIterator it(pDefMD->GetMethodTable());
         for (; it.IsValid(); it.Next())
         {
             MethodDesc* pMD = it.GetMethodDesc();
