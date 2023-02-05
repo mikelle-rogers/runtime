@@ -3270,10 +3270,10 @@ public:
 // come in four flavours, discriminated by the
 // low order bits of the first field:
 //
-//  00 --> GenericMethodDefinition
-//  01 --> UnsharedMethodInstantiation
-//  10 --> SharedMethodInstantiation
-//  11 --> WrapperStubWithInstantiations - and unboxing or instantiating stub
+//  001 --> GenericMethodDefinition
+//  010 --> UnsharedMethodInstantiation
+//  011 --> SharedMethodInstantiation
+//  100 --> WrapperStubWithInstantiations - and unboxing or instantiating stub
 //
 // A SharedMethodInstantiation descriptor extends MethodDesc
 // with a pointer to dictionary layout and a representative instantiation.
