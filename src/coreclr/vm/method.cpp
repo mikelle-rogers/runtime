@@ -943,9 +943,10 @@ PCODE MethodDesc::GetNativeCode()
     {
         // When profiler is enabled, profiler may ask to rejit a code even though we
         // we have ngen code for this MethodDesc.  (See MethodDesc::DoPrestub).
-        // This means that *GetAddrOfNativeCodeSlot()
-        // is not stable. It can turn from non-zero to zero.
-        PCODE pCode = *GetAddrOfNativeCodeSlot();
+        // This means that *ppCode is not stable. It can turn from non-zero to zero.
+        PTR_PCODE ppCode = GetAddrOfNativeCodeSlot();
+        PCODE pCode = *ppCode;
+
 #ifdef TARGET_ARM
         if (pCode != NULL)
             pCode |= THUMB_CODE;
@@ -3258,6 +3259,8 @@ void MethodDesc::ResetCodeEntryPointForEnC()
     _ASSERTE(!IsVersionableWithPrecode());
     _ASSERTE(!MayHaveEntryPointSlotsToBackpatch());
 
+    LOG((LF_ENC, LL_INFO100000, "MD::RCEPFENC: this:%p - %s::%s - HasPrecode():%d, HasNativeCodeSlot():%d\n",
+        this, m_pszDebugClassName, m_pszDebugMethodName, HasPrecode(), HasNativeCodeSlot()));
     if (HasPrecode())
     {
         GetPrecode()->ResetTargetInterlocked();
@@ -3265,7 +3268,11 @@ void MethodDesc::ResetCodeEntryPointForEnC()
 
     if (HasNativeCodeSlot())
     {
-        *GetAddrOfNativeCodeSlot() = NULL;
+        PTR_PCODE ppCode = GetAddrOfNativeCodeSlot();
+        PCODE pCode = *ppCode;
+        LOG((LF_CORDB, LL_INFO1000000, "MD::RCEPFENC: %p -> %p\n",
+            ppCode, pCode));
+        *ppCode = NULL;
     }
 }
 
