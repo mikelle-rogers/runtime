@@ -448,7 +448,7 @@ private:
     // this is shared among all the skippers for this controller. see the comments
     // right before the definition of SharedPatchBypassBuffer for lifetime info.
     SharedPatchBypassBuffer* m_pSharedPatchBypassBuffer;
-#endif // TARGET_ARM
+#endif // !FEATURE_EMULATE_SINGLESTEP
 
 public:
     SIZE_T                  patchId;
@@ -567,7 +567,7 @@ public:
         if (m_pSharedPatchBypassBuffer != NULL)
             m_pSharedPatchBypassBuffer->Release();
     }
-#endif // FEATURE_EMULATE_SINGLESTEP
+#endif // !FEATURE_EMULATE_SINGLESTEP
 
     void LogInstance()
     {
@@ -1025,8 +1025,7 @@ inline void VerifyExecutableAddress(const BYTE* address)
 
 // DebuggerController:   DebuggerController serves
 // both as a static class that dispatches exceptions coming from the
-// EE, and as an abstract base class for the five classes that derrive
-// from it.
+// EE, and as an abstract base class for other debugger concepts.
 class DebuggerController
 {
     VPTR_BASE_CONCRETE_VTABLE_CLASS(DebuggerController);
@@ -1494,7 +1493,7 @@ public:
         BYTE* patchBypass = m_pSharedPatchBypassBuffer->PatchBypass;
         return (CORDB_ADDRESS_TYPE *)patchBypass;
     }
-#endif // TARGET_ARM
+#endif // !FEATURE_EMULATE_SINGLESTEP
 };
 
 /* ------------------------------------------------------------------------- *

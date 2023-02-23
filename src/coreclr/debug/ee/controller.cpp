@@ -94,7 +94,7 @@ SharedPatchBypassBuffer* DebuggerControllerPatch::GetOrCreateSharedPatchBypassBu
 
     return m_pSharedPatchBypassBuffer;
 }
-#endif // FEATURE_EMULATE_SINGLESTEP
+#endif // !FEATURE_EMULATE_SINGLESTEP
 
 // @todo - remove all this splicing trash
 // This Sort/Splice stuff just reorders the patches within a particular chain such
@@ -495,7 +495,7 @@ DebuggerControllerPatch *DebuggerPatchTable::AddPatchForMethodDef(DebuggerContro
 
 #ifndef FEATURE_EMULATE_SINGLESTEP
     patch->Initialize();
-#endif
+#endif // !FEATURE_EMULATE_SINGLESTEP
 
     //initialize the patch data structure.
     InitializePRD(&(patch->opcode));
@@ -601,7 +601,7 @@ DebuggerControllerPatch *DebuggerPatchTable::AddPatchForAddress(DebuggerControll
     }
 #ifndef FEATURE_EMULATE_SINGLESTEP
     patch->Initialize();
-#endif
+#endif // !FEATURE_EMULATE_SINGLESTEP
 
     // initialize the patch data structure
     InitializePRD(&(patch->opcode));
@@ -720,7 +720,7 @@ void DebuggerPatchTable::RemovePatch(DebuggerControllerPatch *patch)
     _ASSERTE( !patch->IsActivated() );
 #ifndef FEATURE_EMULATE_SINGLESTEP
     patch->DoCleanup();
-#endif
+#endif // !FEATURE_EMULATE_SINGLESTEP
 
     //
     // Because of the implementation of CHashTable, we can safely
@@ -4279,7 +4279,7 @@ bool DebuggerController::DispatchNativeException(EXCEPTION_RECORD *pException,
 #ifdef FEATURE_EMULATE_SINGLESTEP
     if (pCurThread->IsSingleStepEnabled())
         pCurThread->ApplySingleStep(pContext);
-#endif
+#endif // FEATURE_EMULATE_SINGLESTEP
 
     FireEtwDebugExceptionProcessingEnd();
 
@@ -4481,7 +4481,7 @@ DebuggerPatchSkip::DebuggerPatchSkip(Thread *thread,
 
     EnableSingleStep();
 
-#endif // FEATURE_EMULATE_SINGLESTEP
+#endif // !FEATURE_EMULATE_SINGLESTEP
 
     EnableExceptionHook();
 }
@@ -4491,7 +4491,7 @@ DebuggerPatchSkip::~DebuggerPatchSkip()
 #ifndef FEATURE_EMULATE_SINGLESTEP
     _ASSERTE(m_pSharedPatchBypassBuffer);
     m_pSharedPatchBypassBuffer->Release();
-#endif
+#endif // !FEATURE_EMULATE_SINGLESTEP
 }
 
 void DebuggerPatchSkip::DebuggerDetachClean()
@@ -4526,7 +4526,7 @@ void DebuggerPatchSkip::DebuggerDetachClean()
             SetIP(context, (PCODE)((BYTE *)GetIP(context) - (patchBypass - (BYTE *)m_address)));
         }
     }
-#endif
+#endif // !FEATURE_EMULATE_SINGLESTEP
 }
 
 
@@ -8199,7 +8199,7 @@ bool DebuggerJMCStepper::DetectHandleInterceptors(ControllerStackInfo * info)
 DebuggerThreadStarter::DebuggerThreadStarter(Thread *thread)
   : DebuggerController(thread, NULL)
 {
-    LOG((LF_CORDB, LL_INFO1000, "DTS::DTS: this:0x%x Thread:0x%x\n",
+    LOG((LF_CORDB, LL_INFO1000, "DTS::DTS: this: %p Thread: %p\n",
         this, thread));
 
     // Check to make sure we only have 1 ThreadStarter on a given thread. (Inspired by NDPWhidbey issue 16888)
