@@ -15,6 +15,7 @@
 #include "eeconfig.h"
 #include "excep.h"
 #include "stackwalk.h"
+#include "methoditer.h"
 
 #ifdef DACCESS_COMPILE
 #include "../debug/daccess/gcinterface.dac.h"
@@ -211,7 +212,7 @@ HRESULT EditAndContinueModule::ApplyEditAndContinue(
     mdToken token;
     while (pIMDInternalImportENC->EnumNext(&enumENC, &token))
     {
-        STRESS_LOG3(LF_ENC, LL_INFO100, "EACM::AEAC: updated token %08x; type %08x; rid %08x\n", token, TypeFromToken(token), RidFromToken(token));
+        STRESS_LOG1(LF_ENC, LL_INFO100, "EACM::AEAC: updated token %08x\n", token);
 
         switch (TypeFromToken(token))
         {
@@ -317,7 +318,8 @@ HRESULT EditAndContinueModule::UpdateMethod(MethodDesc *pMethod)
     // Notify the JIT that we've got new IL for this method
     // This will ensure that all new calls to the method will go to the new version.
     // The runtime does this by never backpatching the methodtable slots in EnC-enabled modules.
-    LOG((LF_ENC, LL_INFO100000, "EACM::UM: Updating function %s to version %d\n", pMethod->m_pszDebugMethodName, m_applyChangesCount));
+    LOG((LF_ENC, LL_INFO100000, "EACM::UM: Updating function %s::%s to version %d\n",
+        pMethod->m_pszDebugClassName, pMethod->m_pszDebugMethodName, m_applyChangesCount));
 
     // Reset any flags relevant to the old code
     //
@@ -325,7 +327,30 @@ HRESULT EditAndContinueModule::UpdateMethod(MethodDesc *pMethod)
     // to the Method's code must be to the call/jmp blob immediately in front of the
     // MethodDesc itself.  See MethodDesc::InEnCEnabledModule()
     //
-    pMethod->ResetCodeEntryPointForEnC();
+    if (!pMethod->HasClassOrMethodInstantiation())
+    {
+        // Not a method impacted by generics, so this is the MethodDesc to use.
+        pMethod->ResetCodeEntryPointForEnC();
+    }
+    else
+    {
+        // Generics are involved so we need to search for all related MethodDescs.
+        Module* module = pMethod->GetLoaderModule();
+        AppDomain* appDomain = module->GetDomain()->AsAppDomain();
+        mdMethodDef tkMethod = pMethod->GetMemberDef();
+
+        LoadedMethodDescIterator it(
+            appDomain,
+            module,
+            tkMethod,
+            AssemblyIterationFlags(kIncludeLoaded | kIncludeExecution));
+        CollectibleAssemblyHolder<DomainAssembly *> pDomainAssembly;
+        while (it.Next(pDomainAssembly.This()))
+        {
+            MethodDesc* pMD = it.Current();
+            pMD->ResetCodeEntryPointForEnC();
+        }
+    }
 
     return S_OK;
 }
@@ -508,8 +533,8 @@ PCODE EditAndContinueModule::JitUpdatedFunction( MethodDesc *pMD,
     }
     CONTRACTL_END;
 
-    LOG((LF_ENC, LL_INFO100, "EnCModule::JitUpdatedFunction for %s\n",
-        pMD->m_pszDebugMethodName));
+    LOG((LF_ENC, LL_INFO100, "EnCModule::JitUpdatedFunction for %s::%s\n",
+        pMD->m_pszDebugClassName, pMD->m_pszDebugMethodName));
 
     PCODE jittedCode = NULL;
 
@@ -543,15 +568,15 @@ PCODE EditAndContinueModule::JitUpdatedFunction( MethodDesc *pMD,
 
     // get the code address (may jit the fcn if not already jitted)
     EX_TRY {
-        if (!pMD->IsPointingToNativeCode())
+        if (pMD->IsPointingToNativeCode())
         {
-            GCX_PREEMP();
-            pMD->DoPrestub(NULL);
-            LOG((LF_ENC, LL_INFO100, "EnCModule::ResumeInUpdatedFunction JIT successful\n"));
+            LOG((LF_ENC, LL_INFO100, "EnCModule::ResumeInUpdatedFunction %p already JITed\n", pMD));
         }
         else
         {
-            LOG((LF_ENC, LL_INFO100, "EnCModule::ResumeInUpdatedFunction function already JITed\n"));
+            GCX_PREEMP();
+            pMD->DoPrestub(NULL);
+            LOG((LF_ENC, LL_INFO100, "EnCModule::ResumeInUpdatedFunction JIT of %p successful\n", pMD));
         }
         jittedCode = pMD->GetNativeCode();
     } EX_CATCH {
@@ -611,8 +636,8 @@ HRESULT EditAndContinueModule::ResumeInUpdatedFunction(
 #if defined(TARGET_ARM) || defined(TARGET_LOONGARCH64)
     return E_NOTIMPL;
 #else
-    LOG((LF_ENC, LL_INFO100, "EnCModule::ResumeInUpdatedFunction for %s at IL offset 0x%x, ",
-        pMD->m_pszDebugMethodName, newILOffset));
+    LOG((LF_ENC, LL_INFO100, "EnCModule::ResumeInUpdatedFunction for %s::%s at IL offset 0x%zx\n",
+        pMD->m_pszDebugClassName, pMD->m_pszDebugMethodName, newILOffset));
 
 #ifdef _DEBUG
     BOOL shouldBreak = CLRConfig::GetConfigValue(
@@ -621,8 +646,6 @@ HRESULT EditAndContinueModule::ResumeInUpdatedFunction(
         _ASSERTE(!"EncResumeInUpdatedFunction");
     }
 #endif
-
-    HRESULT hr = E_FAIL;
 
     // JIT-compile the updated version of the method
     PCODE jittedCode = JitUpdatedFunction(pMD, pOrigContext);
@@ -706,12 +729,10 @@ HRESULT EditAndContinueModule::ResumeInUpdatedFunction(
     LOG((LF_ENC, LL_ERROR, "**Error** EnCModule::ResumeInUpdatedFunction returned from ResumeAtJit"));
     _ASSERTE(!"Should not return from FixContextAndResume()");
 
-    hr = E_FAIL;
-
     // If we fail for any reason we have already potentially trashed with new locals and we have also unwound any
     // Win32 handlers on the stack so cannot ever return from this function.
     EEPOLICY_HANDLE_FATAL_ERROR(CORDBG_E_ENC_INTERNAL_ERROR);
-    return hr;
+    return E_FAIL;
 #endif // #if defined(TARGET_ARM) || defined(TARGET_LOONGARCH64)
 }
 

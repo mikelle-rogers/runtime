@@ -27,29 +27,32 @@ inline DebuggerPatchKind DebuggerControllerPatch::GetKind()
 {
     return kind;
 }
+
 inline BOOL DebuggerControllerPatch::IsILMasterPatch()
 {
     LIMITED_METHOD_CONTRACT;
-
     return (kind == PATCH_KIND_IL_MASTER);
 }
 
 inline BOOL DebuggerControllerPatch::IsILSlavePatch()
 {
     LIMITED_METHOD_CONTRACT;
-
     return (kind == PATCH_KIND_IL_SLAVE);
 }
 
 inline BOOL DebuggerControllerPatch::IsManagedPatch()
 {
     return (IsILMasterPatch() || IsILSlavePatch() || kind == PATCH_KIND_NATIVE_MANAGED);
-
 }
+
 inline BOOL DebuggerControllerPatch::IsNativePatch()
 {
     return (kind == PATCH_KIND_NATIVE_MANAGED || kind == PATCH_KIND_NATIVE_UNMANAGED || (IsILSlavePatch() && !offsetIsIL));
+}
 
+inline BOOL DebuggerControllerPatch::IsEnCRemapPatch()
+{
+    return (controller->GetDCType() == DEBUGGER_CONTROLLER_ENC);
 }
 
 #endif  // CONTROLLER_INL_
