@@ -3379,7 +3379,7 @@ void *NDirectMethodDesc::ResolveAndSetNDirectTarget(_In_ NDirectMethodDesc* pMD)
 
 }
 
-BOOL NDirectMethodDesc::TryResolveNDirectTargetForNoGCTransition(_In_ MethodDesc* pMD, _Out_ void** ndirectTarget)
+BOOL NDirectMethodDesc::TryGetResolvedNDirectTarget(_In_ NDirectMethodDesc* pMD, _Out_ void** ndirectTarget)
 {
     CONTRACTL
     {
@@ -3391,11 +3391,17 @@ BOOL NDirectMethodDesc::TryResolveNDirectTargetForNoGCTransition(_In_ MethodDesc
     }
     CONTRACTL_END
 
+    if (!pMD->NDirectTargetIsImportThunk())
+    {
+        // This is an early out to handle already resolved targets
+        *ndirectTarget = pMD->GetNDirectTarget();
+        return TRUE;
+    }
+
     if (!pMD->ShouldSuppressGCTransition())
         return FALSE;
 
-    _ASSERTE(pMD->IsNDirect());
-    *ndirectTarget = ResolveAndSetNDirectTarget((NDirectMethodDesc*)pMD);
+    *ndirectTarget = ResolveAndSetNDirectTarget(pMD);
     return TRUE;
 
 }
