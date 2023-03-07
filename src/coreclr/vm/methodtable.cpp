@@ -8088,15 +8088,15 @@ namespace
         CONTRACTL_END;
 
         mdMethodDef tkMethod = pDefMD->GetMemberDef();
-        mdFile tkModule = pDefMD->GetModule()->GetModuleRef();
-        LOG((LF_ENC, LL_INFO100, "GPMDENC: %x %x\n", tkMethod, tkModule));
+        Module* mod = pDefMD->GetModule();
+        LOG((LF_ENC, LL_INFO100, "GPMDENC: %x %p\n", tkMethod, mod));
 
         MethodTable::IntroducedMethodIterator it(pDefMD->GetMethodTable());
         for (; it.IsValid(); it.Next())
         {
             MethodDesc* pMD = it.GetMethodDesc();
             if (pMD->GetMemberDef() == tkMethod
-                && pMD->GetModule()->GetModuleRef() == tkModule)
+                && pMD->GetModule() == mod)
             {
                 return pMD;
             }
