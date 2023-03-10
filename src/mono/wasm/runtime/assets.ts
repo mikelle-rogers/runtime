@@ -5,7 +5,6 @@ import cwraps from "./cwraps";
 import { mono_wasm_load_icu_data } from "./icu";
 import { ENVIRONMENT_IS_NODE, ENVIRONMENT_IS_SHELL, ENVIRONMENT_IS_WEB, Module, runtimeHelpers } from "./imports";
 import { mono_wasm_load_bytes_into_heap } from "./memory";
-import { MONO } from "./net6-legacy/imports";
 import { endMeasure, MeasuredBlock, startMeasure } from "./profiler";
 import { createPromiseController, PromiseAndController } from "./promise-controller";
 import { delay } from "./promise-utils";
@@ -20,7 +19,6 @@ let actual_instantiated_assets_count = 0;
 let expected_downloaded_assets_count = 0;
 let expected_instantiated_assets_count = 0;
 const loaded_files: { url: string, file: string }[] = [];
-const loaded_assets: { [id: string]: [VoidPtr, number] } = Object.create(null);
 // in order to prevent net::ERR_INSUFFICIENT_RESOURCES if we start downloading too many files at same time
 let parallel_count = 0;
 let throttlingPromise: PromiseAndController<void> | undefined;
@@ -30,6 +28,7 @@ const skipDownloadsByAssetTypes: {
     [k: string]: boolean
 } = {
     "js-module-threads": true,
+    "dotnetwasm": true,
 };
 
 // `response.arrayBuffer()` can't be called twice. Some usecases are calling it on response in the instantiation.
@@ -46,6 +45,10 @@ const skipInstantiateByAssetTypes: {
     "js-module-threads": true,
     "dotnetwasm": true,
 };
+
+export function shouldLoadIcuAsset(asset: AssetEntryInternal): boolean {
+    return !(asset.behavior == "icu" && asset.name != runtimeHelpers.preferredIcuAsset);
+}
 
 export function resolve_asset_path(behavior: AssetBehaviours) {
     const asset: AssetEntryInternal | undefined = runtimeHelpers.config.assets?.find(a => a.behavior == behavior);
@@ -70,10 +73,10 @@ export async function mono_download_assets(): Promise<void> {
             mono_assert(!asset.resolvedUrl || typeof asset.resolvedUrl === "string", "asset resolvedUrl could be string");
             mono_assert(!asset.hash || typeof asset.hash === "string", "asset resolvedUrl could be string");
             mono_assert(!asset.pendingDownload || typeof asset.pendingDownload === "object", "asset pendingDownload could be object");
-            if (!skipInstantiateByAssetTypes[asset.behavior]) {
+            if (!skipInstantiateByAssetTypes[asset.behavior] && shouldLoadIcuAsset(asset)) {
                 expected_instantiated_assets_count++;
             }
-            if (!skipDownloadsByAssetTypes[asset.behavior]) {
+            if (!skipDownloadsByAssetTypes[asset.behavior] && shouldLoadIcuAsset(asset)) {
                 expected_downloaded_assets_count++;
                 promises_of_assets.push(start_asset_download(asset));
             }
@@ -101,10 +104,10 @@ export async function mono_download_assets(): Promise<void> {
                     const headersOnly = skipBufferByAssetTypes[asset.behavior];
                     if (!headersOnly) {
                         mono_assert(asset.isOptional, "Expected asset to have the downloaded buffer");
-                        if (!skipDownloadsByAssetTypes[asset.behavior]) {
+                        if (!skipDownloadsByAssetTypes[asset.behavior] && shouldLoadIcuAsset(asset)) {
                             expected_downloaded_assets_count--;
                         }
-                        if (!skipInstantiateByAssetTypes[asset.behavior]) {
+                        if (!skipInstantiateByAssetTypes[asset.behavior] && shouldLoadIcuAsset(asset)) {
                             expected_instantiated_assets_count--;
                         }
                     } else {
@@ -261,6 +264,14 @@ async function start_asset_download_sources(asset: AssetEntryInternal): Promise<
             return response;
         }
         catch (err) {
+            if (!response) {
+                response = {
+                    ok: false,
+                    url: attemptUrl,
+                    status: 0,
+                    statusText: "" + err,
+                } as any;
+            }
             continue; //next source
         }
     }
@@ -361,7 +372,6 @@ function _instantiate_asset(asset: AssetEntry, url: string, bytes: Uint8Array) {
         case "heap":
         case "icu":
             offset = mono_wasm_load_bytes_into_heap(bytes);
-            loaded_assets[virtualName] = [offset, bytes.length];
             break;
 
         case "vfs": {
@@ -481,11 +491,6 @@ export function mono_wasm_load_data_archive(data: Uint8Array, prefix: string): b
     data = data.slice(manifestSize + 8);
 
     // Create the folder structure
-    // /usr/share/zoneinfo
-    // /usr/share/zoneinfo/Africa
-    // /usr/share/zoneinfo/Asia
-    // ..
-
     const folders = new Set<string>();
     manifest.filter(m => {
         const file = m[0];
@@ -513,12 +518,12 @@ export async function wait_for_all_assets() {
     if (runtimeHelpers.config.assets) {
         mono_assert(actual_downloaded_assets_count == expected_downloaded_assets_count, () => `Expected ${expected_downloaded_assets_count} assets to be downloaded, but only finished ${actual_downloaded_assets_count}`);
         mono_assert(actual_instantiated_assets_count == expected_instantiated_assets_count, () => `Expected ${expected_instantiated_assets_count} assets to be in memory, but only instantiated ${actual_instantiated_assets_count}`);
-        loaded_files.forEach(value => MONO.loaded_files.push(value.url));
+        loaded_files.forEach(value => runtimeHelpers.loadedFiles.push(value.url));
         if (runtimeHelpers.diagnosticTracing) console.debug("MONO_WASM: all assets are loaded in wasm memory");
     }
 }
 
 // Used by the debugger to enumerate loaded dlls and pdbs
 export function mono_wasm_get_loaded_files(): string[] {
-    return MONO.loaded_files;
+    return runtimeHelpers.loadedFiles;
 }

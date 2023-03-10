@@ -34,11 +34,12 @@ public abstract class WasmAppBuilderBaseTask : Task
 
     // full list of ICU data files we produce can be found here:
     // https://github.com/dotnet/icu/tree/maint/maint-67/icu-filters
-    public string? IcuDataFileName { get; set; }
+    public string[] IcuDataFileNames { get; set; } = Array.Empty<string>();
 
     public int DebugLevel { get; set; }
     public ITaskItem[] SatelliteAssemblies { get; set; } = Array.Empty<ITaskItem>();
     public bool InvariantGlobalization { get; set; }
+    public ITaskItem[] FilesToIncludeInFileSystem { get; set; } = Array.Empty<ITaskItem>();
     public ITaskItem[] ExtraFilesToDeploy { get; set; } = Array.Empty<ITaskItem>();
 
     public string? DefaultHostConfig { get; set; }
@@ -68,7 +69,7 @@ public abstract class WasmAppBuilderBaseTask : Task
 
     protected virtual bool ValidateArguments() => true;
 
-    protected void ProcessSatelliteAssemblies(Action<(string fullPath, string culture)> fn)
+    protected void ProcessSatelliteAssemblies(Action<(string fullPath, string culture)> addSatelliteAssemblyFunc)
     {
         foreach (var assembly in SatelliteAssemblies)
         {
@@ -81,7 +82,7 @@ public abstract class WasmAppBuilderBaseTask : Task
             }
 
             // FIXME: validate the culture?
-            fn((fullPath, culture));
+            addSatelliteAssemblyFunc((fullPath, culture));
         }
     }
 

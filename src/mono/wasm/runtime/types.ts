@@ -2,7 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 import { DotnetHostBuilder } from "./run-outer";
-import { CharPtr, EmscriptenModule, ManagedPointer, NativePointer, VoidPtr, Int32Ptr } from "./types/emscripten";
+import { CharPtr, EmscriptenModule, ManagedPointer, NativePointer, VoidPtr, Int32Ptr, EmscriptenModuleInternal } from "./types/emscripten";
 
 export type GCHandle = {
     __brand: "GCHandle"
@@ -119,6 +119,10 @@ export type MonoConfig = {
      * initial number of workers to add to the emscripten pthread pool
      */
     pthreadPoolSize?: number,
+    /**
+     * hash of assets
+     */
+    assetsHash?: string,
 };
 
 export type MonoConfigInternal = MonoConfig & {
@@ -138,12 +142,6 @@ export type RunArguments = {
     environmentVariables?: { [name: string]: string },
     runtimeOptions?: string[],
     diagnosticTracing?: boolean,
-}
-
-export type MonoConfigError = {
-    isError: true,
-    message: string,
-    error: any
 }
 
 export interface ResourceRequest {
@@ -211,7 +209,6 @@ export type RuntimeHelpers = {
     runtime_interop_exports_class: MonoClass;
 
     _i52_error_scratch_buffer: Int32Ptr;
-    mono_wasm_load_runtime_done: boolean;
     mono_wasm_runtime_is_ready: boolean;
     mono_wasm_bindings_is_ready: boolean;
     mono_wasm_symbols_are_ready: boolean;
@@ -230,6 +227,10 @@ export type RuntimeHelpers = {
     quit: Function,
     locateFile: (path: string, prefix?: string) => string,
     javaScriptExports: JavaScriptExports,
+    loadedFiles: string[],
+    preferredIcuAsset: string | null,
+    timezone: string | null,
+    updateGlobalBufferAndViews: (buffer: ArrayBufferLike) => void
 }
 
 export type GlobalizationMode =
@@ -248,6 +249,7 @@ export type BrowserProfilerOptions = {
 
 // how we extended emscripten Module
 export type DotnetModule = EmscriptenModule & DotnetModuleConfig;
+export type DotnetModuleInternal = EmscriptenModule & DotnetModuleConfig & EmscriptenModuleInternal;
 
 export type DotnetModuleConfig = {
     disableDotnet6Compatibility?: boolean,
