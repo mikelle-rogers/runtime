@@ -2181,8 +2181,8 @@ HRESULT DebuggerMethodInfoTable::AddMethodInfo(Module *pModule,
     }
     CONTRACTL_END;
 
-   LOG((LF_CORDB, LL_INFO1000, "DMIT::AMI Adding dmi:0x%x Mod:0x%x tok:"
-        "0x%x nVer:0x%x\n", mi, pModule, token, mi->GetCurrentEnCVersion()));
+   LOG((LF_CORDB, LL_INFO1000, "DMIT::AMI: Adding dmi:%p Mod:%p tok:0x%08x nVer:0x%x\n",
+        mi, pModule, token, mi->GetCurrentEnCVersion()));
 
    _ASSERTE(mi != NULL);
 
@@ -2199,18 +2199,18 @@ HRESULT DebuggerMethodInfoTable::AddMethodInfo(Module *pModule,
     DebuggerMethodInfoEntry *dmie =
         (DebuggerMethodInfoEntry *) Add(HASH(&dmik));
 
-    if (dmie != NULL)
+    if (dmie == NULL)
     {
-        dmie->key.pModule = pModule;
-        dmie->key.token = token;
-        dmie->mi = mi;
-
-        LOG((LF_CORDB, LL_INFO1000, "DMIT::AJI: mod:0x%x tok:0%x ",
-            pModule, token));
-        return S_OK;
+        ThrowOutOfMemory();
+        return E_OUTOFMEMORY;
     }
 
-    ThrowOutOfMemory();
+    dmie->key.pModule = pModule;
+    dmie->key.token = token;
+    dmie->mi = mi;
+
+    LOG((LF_CORDB, LL_INFO1000, "DMIT::AMI: mod:%p tok:0x%08x\n",
+        pModule, token));
     return S_OK;
 }
 
@@ -2229,8 +2229,8 @@ HRESULT DebuggerMethodInfoTable::OverwriteMethodInfo(Module *pModule,
     }
     CONTRACTL_END;
 
-    LOG((LF_CORDB, LL_INFO1000, "DMIT::OJI: dmi:0x%x mod:0x%x tok:0x%x\n", mi,
-        pModule, token));
+    LOG((LF_CORDB, LL_INFO1000, "DMIT::OMI: dmi:%p mod:%p tok:0x%08x\n",
+        mi, pModule, token));
 
     _ASSERTE(g_pDebugger->HasDebuggerDataLock());
 
@@ -2242,14 +2242,13 @@ HRESULT DebuggerMethodInfoTable::OverwriteMethodInfo(Module *pModule,
       = (DebuggerMethodInfoEntry *) Find(HASH(&dmik), KEY(&dmik));
     if (entry != NULL)
     {
-        if ( (fOnlyIfNull &&
-              entry->mi == NULL) ||
-             !fOnlyIfNull)
+        if ( (fOnlyIfNull && entry->mi == NULL)
+            || !fOnlyIfNull)
         {
             entry->mi = mi;
 
-            LOG((LF_CORDB, LL_INFO1000, "DMIT::OJI: mod:0x%x tok:0x%x remap"
-                "nVer:0x%x\n", pModule, token, entry->nVersionLastRemapped));
+            LOG((LF_CORDB, LL_INFO1000, "DMIT::OMI: mod:%p tok:0x%08x remap nVer:0x%x\n",
+                pModule, token, entry->nVersionLastRemapped));
             return S_OK;
         }
     }

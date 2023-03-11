@@ -212,14 +212,14 @@ HRESULT EditAndContinueModule::ApplyEditAndContinue(
     mdToken token;
     while (pIMDInternalImportENC->EnumNext(&enumENC, &token))
     {
-        STRESS_LOG1(LF_ENC, LL_INFO100, "EACM::AEAC: updated token %08x\n", token);
+        STRESS_LOG1(LF_ENC, LL_INFO100, "EACM::AEAC: updated token 0x%08x\n", token);
 
         switch (TypeFromToken(token))
         {
             case mdtMethodDef:
 
                 // MethodDef token - update/add a method
-                LOG((LF_ENC, LL_INFO10000, "EACM::AEAC: Found method %08x\n", token));
+                LOG((LF_ENC, LL_INFO10000, "EACM::AEAC: Found method 0x%08x\n", token));
 
                 ULONG dwMethodRVA;
                 DWORD dwMethodFlags;
@@ -408,7 +408,7 @@ HRESULT EditAndContinueModule::AddMethod(mdMethodDef token)
     // Add the method to the runtime's Class data structures
     LOG((LF_ENC, LL_INFO100000, "EACM::AM: Adding function %08x to type %08x\n", token, parentTypeDef));
     MethodDesc *pMethod = NULL;
-    hr = EEClass::AddMethod(pParentType, token, 0, &pMethod);
+    hr = EEClass::AddMethod(pParentType, token, &pMethod);
 
     if (FAILED(hr))
     {

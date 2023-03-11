@@ -1549,12 +1549,17 @@ MethodDesc* MethodDesc::LoadTypicalMethodDefinition()
 #ifndef DACCESS_COMPILE
     if (HasClassOrMethodInstantiation())
     {
-        MethodTable *pMT = GetMethodTable();
+        MethodTable* pMT = GetMethodTable();
         if (!pMT->IsTypicalTypeDefinition())
-            pMT = ClassLoader::LoadTypeDefThrowing(pMT->GetModule(),
-                                                   pMT->GetCl(),
-                                                   ClassLoader::ThrowIfNotFound,
-                                                   ClassLoader::PermitUninstDefOrRef).GetMethodTable();
+        {
+            MethodTable* pMTTypical = ClassLoader::LoadTypeDefThrowing(pMT->GetModule(),
+                                                    pMT->GetCl(),
+                                                    ClassLoader::ThrowIfNotFound,
+                                                    ClassLoader::PermitUninstDefOrRef).GetMethodTable();
+            LOG((LF_CLASSLOADER, LL_INFO100000, "MD:LTMD: pMT:%p => pMTTypical:%p\n",
+                pMT, pMTTypical));
+            pMT = pMTTypical;
+        }
         CONSISTENCY_CHECK(TypeHandle(pMT).CheckFullyLoaded());
         MethodDesc *resultMD = pMT->GetParallelMethodDesc(this);
         PREFIX_ASSUME(resultMD != NULL);
@@ -1563,7 +1568,9 @@ MethodDesc* MethodDesc::LoadTypicalMethodDefinition()
     }
     else
 #endif // !DACCESS_COMPILE
+    {
         RETURN(this);
+    }
 }
 
 //*******************************************************************************

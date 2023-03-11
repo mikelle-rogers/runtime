@@ -2548,8 +2548,8 @@ DPOSS_ACTION DebuggerController::ScanForTriggers(CORDB_ADDRESS_TYPE *address,
 
     CONTRACT_VIOLATION(ThrowsViolation);
 
-    LOG((LF_CORDB, LL_INFO10000, "DC::SFT: starting scan for addr:0x%p"
-            " thread:0x%x\n", address, thread));
+    LOG((LF_CORDB, LL_INFO10000, "DC::SFT: starting scan for addr:%p  thread:%p\n",
+        address, thread));
 
     _ASSERTE( pTpr != NULL );
     DebuggerControllerPatch *patch = NULL;
@@ -2587,7 +2587,7 @@ DPOSS_ACTION DebuggerController::ScanForTriggers(CORDB_ADDRESS_TYPE *address,
         DebuggerControllerPatch *patchNext
           = g_patches->GetNextPatch(patch);
 
-        LOG((LF_CORDB, LL_INFO10000, "DC::SFT: patch 0x%x, patchNext 0x%x\n", patch, patchNext));
+        LOG((LF_CORDB, LL_INFO10000, "DC::SFT: patch:%p, patchNext:%p\n", patch, patchNext));
 
         // Annoyingly, TriggerPatch may add patches, which may cause
         // the patch table to move, which may, in turn, invalidate
@@ -2765,7 +2765,7 @@ DPOSS_ACTION DebuggerController::ScanForTriggers(CORDB_ADDRESS_TYPE *address,
     // Significant speed increase from single dereference, I bet :)
     (*pTpr) = tpr;
 
-    LOG((LF_CORDB, LL_INFO10000, "DC::SFT returning 0x%x as used\n",used));
+    LOG((LF_CORDB, LL_INFO10000, "DC::SFT: returning 0x%x as used\n",used));
     return used;
 }
 

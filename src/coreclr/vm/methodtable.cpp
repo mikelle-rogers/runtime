@@ -7655,7 +7655,7 @@ void MethodTable::MethodIterator::Init(MethodTable *pMTDecl, MethodTable *pMTImp
         PRECONDITION(CheckPointer(pMTImpl));
     } CONTRACTL_END;
 
-    LOG((LF_LOADER, LL_INFO10000, "SD: MT::MethodIterator created for %s.\n", pMTDecl->GetDebugClassName()));
+    LOG((LF_LOADER, LL_INFO10000, "MT::MethodIterator created for %s.\n", pMTDecl->GetDebugClassName()));
 
     m_pMethodData = MethodTable::GetMethodData(pMTDecl, pMTImpl);
     CONSISTENCY_CHECK(CheckPointer(m_pMethodData));
@@ -8072,15 +8072,16 @@ MethodTable * MethodTable::GetRestoredSlotMT(DWORD slotNumber)
 namespace
 {
     // Methods added by EnC cannot be looked up by slot since
-    // they have none, see EEClass::AddMethod(). We must perform
+    // they have none, see EEClass::AddMethodDesc(). We must perform
     // a slow lookup instead of using the fast slot lookup path.
-    MethodDesc* GetParallelMethodDescForEnC(MethodDesc* pDefMD)
+    MethodDesc* GetParallelMethodDescForEnC(MethodTable* pMT, MethodDesc* pDefMD)
     {
         CONTRACTL
         {
             NOTHROW;
             GC_NOTRIGGER;
             MODE_ANY;
+            PRECONDITION(pMT != NULL);
             PRECONDITION(pDefMD != NULL);
             PRECONDITION(pDefMD->IsEnCAddedMethod());
             PRECONDITION(pDefMD->GetSlot() == MethodTable::NO_SLOT);
@@ -8089,9 +8090,9 @@ namespace
 
         mdMethodDef tkMethod = pDefMD->GetMemberDef();
         Module* mod = pDefMD->GetModule();
-        LOG((LF_ENC, LL_INFO100, "GPMDENC: %x %p\n", tkMethod, mod));
+        LOG((LF_ENC, LL_INFO100, "GPMDENC: pMT:%p tok:0x%08x mod:%p\n", pMT, tkMethod, mod));
 
-        MethodTable::IntroducedMethodIterator it(pDefMD->GetMethodTable());
+        MethodTable::IntroducedMethodIterator it(pMT);
         for (; it.IsValid(); it.Next())
         {
             MethodDesc* pMD = it.GetMethodDesc();
@@ -8118,7 +8119,7 @@ MethodDesc* MethodTable::GetParallelMethodDesc(MethodDesc* pDefMD)
 
 #ifdef EnC_SUPPORTED
     if (pDefMD->IsEnCAddedMethod())
-        return GetParallelMethodDescForEnC(pDefMD);
+        return GetParallelMethodDescForEnC(this, pDefMD);
 #endif // EnC_SUPPORTED
 
     return GetMethodDescForSlot(pDefMD->GetSlot());

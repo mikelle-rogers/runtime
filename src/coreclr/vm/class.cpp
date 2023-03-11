@@ -517,20 +517,25 @@ HRESULT EEClass::AddField(MethodTable * pMT, mdFieldDef fieldDef, EnCFieldDesc *
 // AddMethod - called when a new method is added by EnC
 //
 // The method has already been added to the metadata with token methodDef.
-// Create a new MethodDesc for the method.
+// Create a new MethodDesc for the method, add to the associated EEClass and
+// update any existing Generic instantiations if the MethodTable represents a
+// generic type.
 //
-HRESULT EEClass::AddMethod(MethodTable * pMT, mdMethodDef methodDef, RVA newRVA, MethodDesc **ppMethod)
+HRESULT EEClass::AddMethod(MethodTable* pMT, mdMethodDef methodDef, MethodDesc** ppMethod)
 {
     CONTRACTL
     {
         THROWS;
         GC_NOTRIGGER;
         MODE_COOPERATIVE;
+        PRECONDITION(pMT != NULL);
+        PRECONDITION(methodDef != mdTokenNil);
     }
     CONTRACTL_END;
 
-    Module * pModule = pMT->GetModule();
-    IMDInternalImport *pImport = pModule->GetMDImport();
+    HRESULT hr;
+    Module* pModule = pMT->GetModule();
+    IMDInternalImport* pImport = pModule->GetMDImport();
 
 #ifdef LOGGING
     if (LoggingEnabled())
@@ -540,26 +545,23 @@ HRESULT EEClass::AddMethod(MethodTable * pMT, mdMethodDef methodDef, RVA newRVA,
         {
             szMethodName = "Invalid MethodDef record";
         }
-        LOG((LF_ENC, LL_INFO100, "EEClass::AddMethod %s\n", szMethodName));
+        LOG((LF_ENC, LL_INFO100, "EEClass::AddMethod %s tok:0x%08x\n", szMethodName, methodDef));
     }
 #endif //LOGGING
 
     DWORD dwDescrOffset;
     DWORD dwImplFlags;
-    HRESULT hr = S_OK;
-
     if (FAILED(pImport->GetMethodImplProps(methodDef, &dwDescrOffset, &dwImplFlags)))
-    {
         return COR_E_BADIMAGEFORMAT;
-    }
 
     DWORD dwMemberAttrs;
-    IfFailThrow(pImport->GetMethodDefProps(methodDef, &dwMemberAttrs));
+    if (FAILED(pImport->GetMethodDefProps(methodDef, &dwMemberAttrs)))
+        return COR_E_BADIMAGEFORMAT;
 
     // Refuse to add other special cases
-    if (IsReallyMdPinvokeImpl(dwMemberAttrs)  ||
-         (pMT->IsInterface() && !IsMdStatic(dwMemberAttrs)) ||
-         IsMiRuntime(dwImplFlags))
+    if (IsReallyMdPinvokeImpl(dwMemberAttrs)
+        || (pMT->IsInterface() && !IsMdStatic(dwMemberAttrs))
+        || IsMiRuntime(dwImplFlags))
     {
         _ASSERTE(! "**Error** EEClass::AddMethod only IL private non-virtual methods are supported");
         LOG((LF_ENC, LL_INFO100, "**Error** EEClass::AddMethod only IL private non-virtual methods are supported\n"));
@@ -569,7 +571,7 @@ HRESULT EEClass::AddMethod(MethodTable * pMT, mdMethodDef methodDef, RVA newRVA,
 #ifdef _DEBUG
     // Validate that this methodDef correctly has a parent typeDef
     mdTypeDef   parentTypeDef;
-    if (FAILED(hr = pImport->GetParentToken(methodDef, &parentTypeDef)))
+    if (FAILED(pImport->GetParentToken(methodDef, &parentTypeDef)))
     {
         _ASSERTE(! "**Error** EEClass::AddMethod parent token not found");
         LOG((LF_ENC, LL_INFO100, "**Error** EEClass::AddMethod parent token not found\n"));
@@ -577,16 +579,99 @@ HRESULT EEClass::AddMethod(MethodTable * pMT, mdMethodDef methodDef, RVA newRVA,
     }
 #endif // _DEBUG
 
-    LoaderAllocator* pAllocator = pMT->GetLoaderAllocator();
+    MethodDesc* pNewMD;
+    if (FAILED(hr = AddMethodDesc(pMT, methodDef, dwImplFlags, dwMemberAttrs, &pNewMD)))
+    {
+        LOG((LF_ENC, LL_INFO100, "EEClass::AddMethod failed: 0x%08x\n", hr));
+        return hr;
+    }
+
+    // Store the new MethodDesc into the collection for this class
+    pModule->EnsureMethodDefCanBeStored(methodDef);
+    pModule->EnsuredStoreMethodDef(methodDef, pNewMD);
+
+    LOG((LF_ENC, LL_INFO100, "EEClass::AddMethod Added pMD:%p for token 0x%08x\n",
+        pNewMD, methodDef));
+
+    // If the type is generic, then we need to update all existing instantiated types
+    if (pMT->IsTypicalTypeDefinition())
+    {
+        LOG((LF_ENC, LL_INFO100, "EEClass::AddMethod Looking for existing instantiated instances\n"));
+
+        EETypeHashTable* paramTypes = pModule->GetAvailableParamTypes();
+        EETypeHashTable::Iterator it(paramTypes);
+        EETypeHashEntry* pEntry;
+        while (paramTypes->FindNext(&it, &pEntry))
+        {
+            TypeHandle th = pEntry->GetTypeHandle();
+            if (th.IsTypeDesc())
+                continue;
+
+            // Only update instantiations of the typical MethodTable we updated above.
+            MethodTable* pMTMaybe = th.AsMethodTable();
+            if (!pMTMaybe->IsCanonicalMethodTable() || !pMT->HasSameTypeDefAs(pMTMaybe))
+            {
+                continue;
+            }
+
+            MethodDesc* pNewMDUnused;
+            if (FAILED(AddMethodDesc(pMTMaybe, methodDef, dwImplFlags, dwMemberAttrs, &pNewMDUnused)))
+            {
+                LOG((LF_ENC, LL_INFO100, "EEClass::AddMethod failed: 0x%08x\n", hr));
+                EEPOLICY_HANDLE_FATAL_ERROR_WITH_MESSAGE(COR_E_FAILFAST,
+                    W("Failed to update existing instantiated type instance"));
+                return E_FAIL;
+            }
+        }
+    }
+
+    // Success - return the new MethodDesc
+    if (ppMethod)
+        *ppMethod = pNewMD;
+
+    return S_OK;
+}
+
+//---------------------------------------------------------------------------------------
+//
+// AddMethodDesc - called when a new MethodDesc needs to be created and added for EnC
+//
+HRESULT EEClass::AddMethodDesc(
+    MethodTable* pMT,
+    mdMethodDef methodDef,
+    DWORD dwImplFlags,
+    DWORD dwMemberAttrs,
+    MethodDesc** ppNewMD)
+{
+    CONTRACTL
+    {
+        THROWS;
+        GC_NOTRIGGER;
+        MODE_COOPERATIVE;
+        PRECONDITION(pMT != NULL);
+        PRECONDITION(methodDef != mdTokenNil);
+        PRECONDITION(ppNewMD != NULL);
+    }
+    CONTRACTL_END;
+
+    LOG((LF_ENC, LL_INFO100, "EEClass::AddMethodDesc pMT:%p, %s <- tok:0x%08x flags:%u attrs:%u\n",
+        pMT, pMT->debug_m_szClassName, methodDef, dwImplFlags, dwMemberAttrs));
+
+    HRESULT hr;
+    Module* pModule = pMT->GetModule();
+    IMDInternalImport* pImport = pModule->GetMDImport();
 
     // Check if signature is generic.
     ULONG sigLen;
     PCCOR_SIGNATURE sig;
-    IfFailThrow(pImport->GetSigOfMethodDef(methodDef, &sigLen, &sig));
+    if (FAILED(hr = pImport->GetSigOfMethodDef(methodDef, &sigLen, &sig)))
+        return hr;
     uint32_t callConv = CorSigUncompressData(sig);
     DWORD classification = (callConv & IMAGE_CEE_CS_CALLCONV_GENERIC)
         ? mcInstantiated
         : mcIL;
+
+    LoaderAllocator* pAllocator = pMT->GetLoaderAllocator();
 
     // [TODO] OOM: InitMethodDesc will allocate loaderheap memory but leak it
     //   on failure. This AllocMemTracker should be replaced with a real one.
@@ -595,62 +680,62 @@ HRESULT EEClass::AddMethod(MethodTable * pMT, mdMethodDef methodDef, RVA newRVA,
     // Create a new MethodDescChunk to hold the new MethodDesc.
     // Create the chunk somewhere we'll know is within range of the VTable.
     MethodDescChunk *pChunk = MethodDescChunk::CreateChunk(pAllocator->GetHighFrequencyHeap(),
-                                                           1,   // methodDescCount
-                                                           classification,
-                                                           TRUE, // fNonVtableSlot
-                                                           TRUE, // fNativeCodeSlot
-                                                           pMT,
-                                                           &dummyAmTracker);
+                                                            1,   // methodDescCount
+                                                            classification,
+                                                            TRUE, // fNonVtableSlot
+                                                            TRUE, // fNativeCodeSlot
+                                                            pMT,
+                                                            &dummyAmTracker);
 
     // Get the new MethodDesc (Note: The method desc memory is zero initialized)
-    MethodDesc *pNewMD = pChunk->GetFirstMethodDesc();
+    MethodDesc* pNewMD = pChunk->GetFirstMethodDesc();
 
     EEClass* pClass = pMT->GetClass();
 
-     // This method runs on a debugger thread. Debugger threads do not have Thread object
-     // that caches StackingAllocator, use a local StackingAllocator instead.
+        // This method runs on a debugger thread. Debugger threads do not have Thread object
+        // that caches StackingAllocator, use a local StackingAllocator instead.
     StackingAllocator stackingAllocator;
 
     MethodTableBuilder::bmtInternalInfo bmtInternal;
-    bmtInternal.pModule = pMT->GetModule();
+    bmtInternal.pModule = pModule;
     bmtInternal.pInternalImport = NULL;
     bmtInternal.pParentMT = NULL;
 
     MethodTableBuilder builder(pMT,
-                               pClass,
-                               &stackingAllocator,
-                               &dummyAmTracker);
+                                pClass,
+                                &stackingAllocator,
+                                &dummyAmTracker);
 
     builder.SetBMTData(pMT->GetLoaderAllocator(),
-                       NULL,
-                       NULL,
-                       NULL,
-                       NULL,
-                       NULL,
-                       NULL,
-                       NULL,
-                       NULL,
-                       NULL,
-                       &bmtInternal);
+                        NULL,
+                        NULL,
+                        NULL,
+                        NULL,
+                        NULL,
+                        NULL,
+                        NULL,
+                        NULL,
+                        NULL,
+                        &bmtInternal);
 
     // Initialize the new MethodDesc
     EX_TRY
     {
-        INDEBUG(LPCSTR debug_szFieldName);
-        INDEBUG(if (FAILED(pImport->GetNameOfMethodDef(methodDef, &debug_szFieldName))) { debug_szFieldName = "Invalid MethodDef record"; });
+        INDEBUG(LPCSTR debug_szMethodName);
+        INDEBUG(if (FAILED(pImport->GetNameOfMethodDef(methodDef, &debug_szMethodName))) { debug_szMethodName = "Invalid MethodDef record"; });
         builder.InitMethodDesc(pNewMD,
-                               classification,
-                               methodDef,
-                               dwImplFlags,
-                               dwMemberAttrs,
-                               TRUE,    // fEnC
-                               newRVA,
-                               pImport,
-                               NULL
-                               COMMA_INDEBUG(debug_szFieldName)
-                               COMMA_INDEBUG(pMT->GetDebugClassName())
-                               COMMA_INDEBUG(NULL)
-                              );
+                                classification,
+                                methodDef,
+                                dwImplFlags,
+                                dwMemberAttrs,
+                                TRUE,   // fEnC
+                                0,      // RVA - non-zero only for NDirect
+                                pImport,
+                                NULL
+                                COMMA_INDEBUG(debug_szMethodName)
+                                COMMA_INDEBUG(pMT->GetDebugClassName())
+                                COMMA_INDEBUG(NULL)
+                                );
 
         pNewMD->SetTemporaryEntryPoint(pAllocator, &dummyAmTracker);
 
@@ -670,18 +755,8 @@ HRESULT EEClass::AddMethod(MethodTable * pMT, mdMethodDef methodDef, RVA newRVA,
 
     pClass->AddChunk(pChunk);
 
-    // Store the new MethodDesc into the collection for this class
-    pModule->EnsureMethodDefCanBeStored(methodDef);
-    pModule->EnsuredStoreMethodDef(methodDef, pNewMD);
+    *ppNewMD = pNewMD;
 
-    LOG((LF_ENC, LL_INFO100, "EEClass::AddMethod new methoddesc %p for token %p\n", pNewMD, methodDef));
-
-    // Success - return the new MethodDesc
-    _ASSERTE( SUCCEEDED(hr) );
-    if (ppMethod)
-    {
-        *ppMethod = pNewMD;
-    }
     return S_OK;
 }
 

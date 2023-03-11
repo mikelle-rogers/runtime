@@ -780,10 +780,17 @@ public:
 
 #ifdef EnC_SUPPORTED
     // Add a new method to an already loaded type for EnC
-    static HRESULT AddMethod(MethodTable * pMT, mdMethodDef methodDef, RVA newRVA, MethodDesc **ppMethod);
-
+    static HRESULT AddMethod(MethodTable* pMT, mdMethodDef methodDef, MethodDesc** ppMethod);
+private:
+    static HRESULT AddMethodDesc(
+        MethodTable* pMT,
+        mdMethodDef methodDef,
+        DWORD dwImplFlags,
+        DWORD dwMemberAttrs,
+        MethodDesc** ppNewMD);
+public:
     // Add a new field to an already loaded type for EnC
-    static HRESULT AddField(MethodTable * pMT, mdFieldDef fieldDesc, EnCFieldDesc **pAddedField);
+    static HRESULT AddField(MethodTable* pMT, mdFieldDef fieldDesc, EnCFieldDesc** pAddedField);
     static VOID    FixupFieldDescForEnC(MethodTable * pMT, EnCFieldDesc *pFD, mdFieldDef fieldDef);
 #endif // EnC_SUPPORTED
 
@@ -1425,9 +1432,9 @@ public:
     BOOL HasExplicitSize();
 
     BOOL IsAutoLayoutOrHasAutoLayoutField();
-    
+
     // Only accurate on non-auto layout types
-    BOOL IsInt128OrHasInt128Fields(); 
+    BOOL IsInt128OrHasInt128Fields();
 
     static void GetBestFitMapping(MethodTable * pMT, BOOL *pfBestFitMapping, BOOL *pfThrowOnUnmappableChar);
 
@@ -2125,7 +2132,7 @@ inline BOOL EEClass::IsAutoLayoutOrHasAutoLayoutField()
 
 inline BOOL EEClass::IsInt128OrHasInt128Fields()
 {
-    // The name of this type is a slight misnomer as it doesn't detect Int128 fields on 
+    // The name of this type is a slight misnomer as it doesn't detect Int128 fields on
     // auto layout types, but since we only need this for interop scenarios, it works out.
     LIMITED_METHOD_CONTRACT;
     // If this type is not auto

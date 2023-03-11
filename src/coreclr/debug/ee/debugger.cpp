@@ -10528,13 +10528,12 @@ bool Debugger::HandleIPCEvent(DebuggerIPCEvent * pEvent)
 
     case DB_IPCE_STEP:
         {
-            LOG((LF_CORDB,LL_INFO10000, "D::HIPCE: stepIn:0x%x frmTok:0x%x"
-                "StepIn:0x%x RangeIL:0x%x RangeCount:0x%x MapStop:0x%x "
+            LOG((LF_CORDB,LL_INFO10000, "D::HIPCE: frame SP:%p "
+                "StepIn:%s RangeIL:%s RangeCount:%u MapStop:0x%x "
                 "InterceptStop:0x%x AppD:%p\n",
-                pEvent->StepData.stepIn,
                 pEvent->StepData.frameToken.GetSPValue(),
-                pEvent->StepData.stepIn,
-                pEvent->StepData.rangeIL,
+                (pEvent->StepData.stepIn ? "true" : "false"),
+                (pEvent->StepData.rangeIL ? "true" : "false"),
                 pEvent->StepData.rangeCount,
                 pEvent->StepData.rgfMappingStop,
                 pEvent->StepData.rgfInterceptStop,
@@ -10796,7 +10795,7 @@ bool Debugger::HandleIPCEvent(DebuggerIPCEvent * pEvent)
             _ASSERTE(pDebuggerModule != NULL);
 
             LOG((LF_CORDB, LL_INFO10000,
-                 "D::HIPCE: class load flag is %d for module 0x%p\n",
+                 "D::HIPCE: class load flag is 0x%x for module %p\n",
                  pEvent->SetClassLoad.flag,
                  pDebuggerModule));
 
@@ -11113,7 +11112,7 @@ bool Debugger::HandleIPCEvent(DebuggerIPCEvent * pEvent)
 
     case DB_IPCE_FUNC_EVAL_ABORT:
         {
-            LOG((LF_CORDB, LL_INFO1000, "D::HIPCE: Got FuncEvalAbort for pDE:%08x\n",
+            LOG((LF_CORDB, LL_INFO1000, "D::HIPCE: Got FuncEvalAbort for pDE:%p\n",
                 pEvent->FuncEvalAbort.debuggerEvalKey.UnWrap()));
 
             // This is a synchronous event (reply required)
@@ -11129,7 +11128,7 @@ bool Debugger::HandleIPCEvent(DebuggerIPCEvent * pEvent)
 
     case DB_IPCE_FUNC_EVAL_RUDE_ABORT:
         {
-            LOG((LF_CORDB, LL_INFO1000, "D::HIPCE: Got FuncEvalRudeAbort for pDE:%08x\n",
+            LOG((LF_CORDB, LL_INFO1000, "D::HIPCE: Got FuncEvalRudeAbort for pDE:%p\n",
                 pEvent->FuncEvalRudeAbort.debuggerEvalKey.UnWrap()));
 
             // This is a synchronous event (reply required)
