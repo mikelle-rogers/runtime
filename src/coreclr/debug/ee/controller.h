@@ -331,23 +331,23 @@ struct DebuggerFunctionKey1
 
 typedef DebuggerFunctionKey1 UNALIGNED DebuggerFunctionKey;
 
-// IL Master: Breakpoints on IL code may need to be applied to multiple
+// IL Primary: Breakpoints on IL code may need to be applied to multiple
 // copies of code. Historically generics was the only way IL code was JITTed
 // multiple times but more recently the CodeVersionManager and tiered compilation
 // provide more open-ended mechanisms to have multiple native code bodies derived
 // from a single IL method body.
-// The "master" is a patch we keep to record the IL offset or native offset, and
-// is used to create new "slave"patches. For native offsets only offset 0 is allowed
+// The "primary" is a patch we keep to record the IL offset or native offset, and
+// is used to create new "replica" patches. For native offsets only offset 0 is allowed
 // because that is the only one that we think would have a consistent semantic
 // meaning across different code bodies.
 // There can also be multiple IL bodies for the same method given EnC or ReJIT.
-// A given master breakpoint is tightly bound to one particular IL body determined
+// A given primary breakpoint is tightly bound to one particular IL body determined
 // by encVersion. ReJIT + breakpoints isn't currently supported.
 //
 //
-// IL Slave: The slaves created from Master patches. If the master used an IL offset
-// then the slave also initially has an IL offset that will later become a native offset.
-// If the master uses a native offset (0) then the slave will also have a native offset (0).
+// IL Replica: The replicas created from Primary patches. If the primary used an IL offset
+// then the replica also initially has an IL offset that will later become a native offset.
+// If the primary uses a native offset (0) then the replica will also have a native offset (0).
 // These patches always resolve to addresses in jitted code.
 //
 //
@@ -360,7 +360,7 @@ typedef DebuggerFunctionKey1 UNALIGNED DebuggerFunctionKey;
 //
 // NativeUnmanaged: A patch applied to any kind of native code.
 
-enum DebuggerPatchKind { PATCH_KIND_IL_MASTER, PATCH_KIND_IL_SLAVE, PATCH_KIND_NATIVE_MANAGED, PATCH_KIND_NATIVE_UNMANAGED };
+enum DebuggerPatchKind { PATCH_KIND_IL_PRIMARY, PATCH_KIND_IL_REPLICA, PATCH_KIND_NATIVE_MANAGED, PATCH_KIND_NATIVE_UNMANAGED };
 
 // struct DebuggerControllerPatch:  An entry in the patch (hash) table,
 // this should contain all the info that's needed over the course of a
@@ -433,15 +433,15 @@ struct DebuggerControllerPatch
     PRD_TYPE                opcodeSaved;
     BOOL                    offsetIsIL;
     TraceDestination        trace;
-    MethodDesc*             pMethodDescFilter; // used for IL Master patches that should only bind to jitted
+    MethodDesc*             pMethodDescFilter; // used for IL Primary patches that should only bind to jitted
                                                // code versions for a single generic instantiation
 private:
     DebuggerPatchKind       kind;
     int                     refCount;
     union
     {
-        SIZE_T     encVersion; // used for Master patches, to record which EnC version this Master applies to
-        DebuggerJitInfo        *dji; // used for Slave and native patches, though only when tracking JIT Info
+        SIZE_T     encVersion; // used for Primary patches, to record which EnC version this Primary applies to
+        DebuggerJitInfo        *dji; // used for Replica and native patches, though only when tracking JIT Info
     };
 
 #ifndef FEATURE_EMULATE_SINGLESTEP
@@ -456,13 +456,13 @@ public:
 
     BOOL IsNativePatch();
     BOOL IsManagedPatch();
-    BOOL IsILMasterPatch();
-    BOOL IsILSlavePatch();
+    BOOL IsILPrimaryPatch();
+    BOOL IsILReplicaPatch();
     DebuggerPatchKind  GetKind();
 
     // A patch has DJI if it was created with it or if it has been mapped to a
     // function that has been jitted while JIT tracking was on.  It does not
-    // necessarily mean the patch is bound.  ILMaster patches never have DJIs.
+    // necessarily mean the patch is bound.  ILPrimary patches never have DJIs.
     // Patches will never have DJIs if we are not tracking JIT information.
     //
     // Patches can also be unbound, e.g. in UnbindFunctionPatches.  Any DJI gets cleared
@@ -471,12 +471,12 @@ public:
     // we don't skip the patch when we get new code.
     BOOL HasDJI()
     {
-        return (!IsILMasterPatch() && dji != NULL);
+        return (!IsILPrimaryPatch() && dji != NULL);
     }
 
     DebuggerJitInfo *GetDJI()
     {
-        _ASSERTE(!IsILMasterPatch());
+        _ASSERTE(!IsILPrimaryPatch());
         return dji;
     }
 
@@ -488,13 +488,13 @@ public:
     //
     BOOL HasEnCVersion()
     {
-        return (IsILMasterPatch() || HasDJI());
+        return (IsILPrimaryPatch() || HasDJI());
     }
 
     SIZE_T GetEnCVersion()
     {
         _ASSERTE(HasEnCVersion());
-        return (IsILMasterPatch() ? encVersion : (HasDJI() ? GetDJI()->m_encVersion : CorDB_DEFAULT_ENC_FUNCTION_VERSION));
+        return (IsILPrimaryPatch() ? encVersion : (HasDJI() ? GetDJI()->m_encVersion : CorDB_DEFAULT_ENC_FUNCTION_VERSION));
     }
 
     // We set the DJI explicitly after mapping a patch
@@ -503,7 +503,7 @@ public:
     // should not skip the patch.
     void SetDJI(DebuggerJitInfo *newDJI)
     {
-        _ASSERTE(!IsILMasterPatch());
+        _ASSERTE(!IsILPrimaryPatch());
         dji = newDJI;
     }
 
@@ -521,8 +521,8 @@ public:
             return FALSE;
         }
 
-        // IL Master patches are never bound.
-        _ASSERTE( !IsILMasterPatch() );
+        // IL Primary patches are never bound.
+        _ASSERTE( !IsILPrimaryPatch() );
 
         return TRUE;
     }
@@ -581,14 +581,14 @@ public:
             "              IsBound: %s\n"
             "        IsNativePatch: %s\n"
             "       IsManagedPatch: %s\n"
-            "      IsILMasterPatch: %s\n"
-            "       IsILSlavePatch: %s\n",
+            "     IsILPrimaryPatch: %s\n"
+            "     IsILReplicaPatch: %s\n",
             this, patchId, offset, address, (offsetIsIL ? "true" : "false"), refCount, GetKind(),
             (IsBound() ? "true" : "false"),
             (IsNativePatch() ? "true" : "false"),
             (IsManagedPatch() ? "true" : "false"),
-            (IsILMasterPatch() ? "true" : "false"),
-            (IsILSlavePatch() ? "true" : "false")));
+            (IsILPrimaryPatch() ? "true" : "false"),
+            (IsILReplicaPatch() ? "true" : "false")));
     }
 };
 
@@ -766,7 +766,7 @@ public:
                                       DebuggerPatchKind kind,
                                       FramePointer fp,
                                       AppDomain *pAppDomain,
-                                      SIZE_T masterEnCVersion,
+                                      SIZE_T primaryEnCVersion,
                                       DebuggerJitInfo *dji);
 
     DebuggerControllerPatch *AddPatchForAddress(DebuggerController *controller,
@@ -1320,14 +1320,14 @@ public:
     // Helper function that is called on each virtual trace call target to set a trace patch
     static void PatchTargetVisitor(TADDR pVirtualTraceCallTarget, VOID* pUserData);
 
-    DebuggerControllerPatch *AddILMasterPatch(Module *module,
+    DebuggerControllerPatch *AddILPrimaryPatch(Module *module,
                   mdMethodDef md,
                   MethodDesc *pMethodDescFilter,
                   SIZE_T offset,
                   BOOL offsetIsIL,
                   SIZE_T encVersion);
 
-    BOOL AddBindAndActivateILSlavePatch(DebuggerControllerPatch *master,
+    BOOL AddBindAndActivateILReplicaPatch(DebuggerControllerPatch *primary,
                                         DebuggerJitInfo *dji);
 
     BOOL AddILPatch(AppDomain * pAppDomain, Module *module,
@@ -1955,7 +1955,7 @@ public:
 private:
     TP_RESULT TriggerPatch(DebuggerControllerPatch *patch,
                       Thread *thread,
-                      TRIGGER_WHY tyWhy);
+                      TRIGGER_WHY tyWhy) override;
 
     TP_RESULT HandleRemapComplete(DebuggerControllerPatch *patch,
                                    Thread *thread,

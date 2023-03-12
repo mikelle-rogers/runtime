@@ -469,7 +469,7 @@ DebuggerControllerPatch *DebuggerPatchTable::AddPatchForMethodDef(DebuggerContro
                                   DebuggerPatchKind kind,
                                   FramePointer fp,
                                   AppDomain *pAppDomain,
-                                  SIZE_T masterEnCVersion,
+                                  SIZE_T primaryEnCVersion,
                                   DebuggerJitInfo *dji)
 {
     CONTRACTL
@@ -513,10 +513,10 @@ DebuggerControllerPatch *DebuggerPatchTable::AddPatchForMethodDef(DebuggerContro
     patch->pAppDomain = pAppDomain;
     patch->patchId = m_patchId++;
 
-    if (kind == PATCH_KIND_IL_MASTER)
+    if (kind == PATCH_KIND_IL_PRIMARY)
     {
         _ASSERTE(dji == NULL);
-        patch->encVersion = masterEnCVersion;
+        patch->encVersion = primaryEnCVersion;
     }
     else
     {
@@ -529,10 +529,10 @@ DebuggerControllerPatch *DebuggerPatchTable::AddPatchForMethodDef(DebuggerContro
         LOG((LF_CORDB,LL_INFO10000,"DPT:APFMD w/ encVersion 0x%04x, patchId:0x%x\n",
             dji->m_encVersion, patch->patchId));
     }
-    else if (kind == PATCH_KIND_IL_MASTER)
+    else if (kind == PATCH_KIND_IL_PRIMARY)
     {
-        LOG((LF_CORDB,LL_INFO10000,"DPT:APFMD w/ encVersion 0x%04x, patchId:0x%x (master)\n",
-            masterEnCVersion, patch->patchId));
+        LOG((LF_CORDB,LL_INFO10000,"DPT:APFMD w/ encVersion 0x%04x, patchId:0x%x (primary)\n",
+            primaryEnCVersion, patch->patchId));
     }
     else
     {
@@ -544,18 +544,18 @@ DebuggerControllerPatch *DebuggerPatchTable::AddPatchForMethodDef(DebuggerContro
     _ASSERTE( !patch->IsBound() );
     _ASSERTE( !patch->IsActivated() );
 
-    // The only kind of patch with IL offset is the IL master patch.
-    _ASSERTE(patch->IsILMasterPatch() || patch->offsetIsIL == FALSE);
+    // The only kind of patch with IL offset is the IL primary patch.
+    _ASSERTE(patch->IsILPrimaryPatch() || patch->offsetIsIL == FALSE);
 
-    // The only kind of patch that allows a MethodDescFilter is the IL master patch
-    _ASSERTE(patch->IsILMasterPatch() || patch->pMethodDescFilter == NULL);
+    // The only kind of patch that allows a MethodDescFilter is the IL primary patch
+    _ASSERTE(patch->IsILPrimaryPatch() || patch->pMethodDescFilter == NULL);
 
     // Zero is the only native offset that we allow to bind across different jitted
     // code bodies. There isn't any sensible meaning to binding at some other native offset.
     // Even if all the code bodies had an instruction that started at that offset there is
     // no guarantee those instructions represent a semantically equivalent point in the
     // method's execution.
-    _ASSERTE(!(patch->IsILMasterPatch() && !patch->offsetIsIL && patch->offset != 0));
+    _ASSERTE(!(patch->IsILPrimaryPatch() && !patch->offsetIsIL && patch->offset != 0));
 
     return patch;
 }
@@ -650,8 +650,8 @@ DebuggerControllerPatch *DebuggerPatchTable::AddPatchForAddress(DebuggerControll
     _ASSERTE( patch->IsBound() );
     _ASSERTE( !patch->IsActivated() );
 
-    // The only kind of patch with IL offset is the IL master patch.
-    _ASSERTE(patch->IsILMasterPatch() || patch->offsetIsIL == FALSE);
+    // The only kind of patch with IL offset is the IL primary patch.
+    _ASSERTE(patch->IsILPrimaryPatch() || patch->offsetIsIL == FALSE);
     return patch;
 }
 
@@ -660,7 +660,7 @@ void DebuggerPatchTable::BindPatch(DebuggerControllerPatch *patch, CORDB_ADDRESS
 {
     _ASSERTE(patch != NULL);
     _ASSERTE(address != NULL);
-    _ASSERTE( !patch->IsILMasterPatch() );
+    _ASSERTE( !patch->IsILPrimaryPatch() );
     _ASSERTE(!patch->IsBound() );
 
     //Since the actual patch doesn't move, we don't have to worry about
@@ -683,7 +683,7 @@ void DebuggerPatchTable::BindPatch(DebuggerControllerPatch *patch, CORDB_ADDRESS
 void DebuggerPatchTable::UnbindPatch(DebuggerControllerPatch *patch)
 {
     _ASSERTE(patch != NULL);
-    _ASSERTE(patch->kind != PATCH_KIND_IL_MASTER);
+    _ASSERTE(patch->kind != PATCH_KIND_IL_PRIMARY);
     _ASSERTE(patch->IsBound() );
     _ASSERTE(!patch->IsActivated() );
 
@@ -1223,7 +1223,7 @@ bool DebuggerController::BindPatch(DebuggerControllerPatch *patch,
     CONTRACTL_END;
 
     _ASSERTE(patch != NULL);
-    _ASSERTE(!patch->IsILMasterPatch());
+    _ASSERTE(!patch->IsILPrimaryPatch());
     _ASSERTE(pMD != NULL);
 
     LOG((LF_CORDB,LL_INFO10000, "DC::BP: Patch %p (patchId:0x%x) to %s::%s (pMD: %p) at %p\n",
@@ -1753,9 +1753,9 @@ void DebuggerController::DeactivatePatch(DebuggerControllerPatch *patch)
     //
 }
 
-// AddILMasterPatch: record a patch on IL code but do not bind it or activate it.  The master b.p.
+// AddILPrimaryPatch: record a patch on IL code but do not bind it or activate it.  The primary b.p.
 // is associated with a module/token pair.  It is used later
-// (e.g. in MapAndBindFunctionPatches) to create one or more "slave"
+// (e.g. in MapAndBindFunctionPatches) to create one or more "replica"
 // breakpoints which are associated with particular MethodDescs/JitInfos.
 //
 // Rationale: For generic code a single IL patch (e.g a breakpoint)
@@ -1765,14 +1765,14 @@ void DebuggerController::DeactivatePatch(DebuggerControllerPatch *patch)
 //
 // So we keep one patch which describes
 // the breakpoint but which is never actually bound or activated.
-// This is then used to apply new "slave" patches to all copies of
+// This is then used to apply new "replica" patches to all copies of
 // JITted code associated with the method.
 //
-// <REVISIT_TODO>In theory we could bind and apply the master patch when the
+// <REVISIT_TODO>In theory we could bind and apply the primary patch when the
 // code is known not to be generic (as used to happen to all breakpoint
 // patches in V1).  However this seems like a premature
 // optimization.</REVISIT_TODO>
-DebuggerControllerPatch *DebuggerController::AddILMasterPatch(Module *module,
+DebuggerControllerPatch *DebuggerController::AddILPrimaryPatch(Module *module,
                                                               mdMethodDef md,
                                                               MethodDesc *pMethodDescFilter,
                                                               SIZE_T offset,
@@ -1798,52 +1798,52 @@ DebuggerControllerPatch *DebuggerController::AddILMasterPatch(Module *module,
                                      pMethodDescFilter,
                                      offset,
                                      offsetIsIL,
-                                     PATCH_KIND_IL_MASTER,
+                                     PATCH_KIND_IL_PRIMARY,
                                      LEAF_MOST_FRAME,
                                      NULL,
                                      encVersion,
                                      NULL);
 
     LOG((LF_CORDB, LL_INFO10000,
-        "DC::AP: Added IL master patch %p for mdTok 0x%x, filter %p at %s offset 0x%zx encVersion %zx\n",
+        "DC::AP: Added IL primary patch %p for mdTok 0x%x, filter %p at %s offset 0x%zx encVersion %zx\n",
         patch, md, pMethodDescFilter, (offsetIsIL ? "IL" : "native"), offset, encVersion));
 
     return patch;
 }
 
-// See notes above on AddILMasterPatch
-BOOL DebuggerController::AddBindAndActivateILSlavePatch(DebuggerControllerPatch *master,
+// See notes above on AddILPrimaryPatch
+BOOL DebuggerController::AddBindAndActivateILReplicaPatch(DebuggerControllerPatch *primary,
                                                         DebuggerJitInfo *dji)
 {
     _ASSERTE(g_patches != NULL);
-    _ASSERTE(master->IsILMasterPatch());
+    _ASSERTE(primary->IsILPrimaryPatch());
     _ASSERTE(dji != NULL);
 
     BOOL result = FALSE;
     MethodDesc* pMD = dji->m_nativeCodeVersion.GetMethodDesc();
 
-    if (master->offsetIsIL == 0)
+    if (primary->offsetIsIL == 0)
     {
         // Zero is the only native offset that we allow to bind across different jitted
         // code bodies.
-        _ASSERTE(master->offset == 0);
+        _ASSERTE(primary->offset == 0);
         INDEBUG(BOOL fOk = )
             AddBindAndActivatePatchForMethodDesc(pMD, dji,
-                0, PATCH_KIND_IL_SLAVE,
+                0, PATCH_KIND_IL_REPLICA,
                 LEAF_MOST_FRAME, m_pAppDomain);
         _ASSERTE(fOk);
         result = TRUE;
     }
     else // bind by IL offset
     {
-        // Do not dereference the "master" pointer in the loop!  The loop may add more patches,
+        // Do not dereference the "primary" pointer in the loop!  The loop may add more patches,
         // causing the patch table to grow and move.
-        SIZE_T masterILOffset = master->offset;
+        SIZE_T primaryILOffset = primary->offset;
 
         // Loop through all the native offsets mapped to the given IL offset.  On x86 the mapping
         // should be 1:1.  On WIN64, because there are funclets, we have a 1:N mapping.
         DebuggerJitInfo::ILToNativeOffsetIterator it;
-        for (dji->InitILToNativeOffsetIterator(it, masterILOffset); !it.IsAtEnd(); it.Next())
+        for (dji->InitILToNativeOffsetIterator(it, primaryILOffset); !it.IsAtEnd(); it.Next())
         {
             BOOL   fExact;
             SIZE_T offsetNative = it.Current(&fExact);
@@ -1852,10 +1852,10 @@ BOOL DebuggerController::AddBindAndActivateILSlavePatch(DebuggerControllerPatch 
             // at the beginning of a method that hasn't been jitted yet.  In
             // that case it's possible that offset 0 has been optimized out,
             // but we still want to set the closest breakpoint to that.
-            if (!fExact && (masterILOffset != 0))
+            if (!fExact && (primaryILOffset != 0))
             {
                 LOG((LF_CORDB, LL_INFO10000, "DC::BP:Failed to bind patch in %s::%s at IL offset 0x%zx, native offset 0x%zx\n",
-                    pMD->m_pszDebugClassName, pMD->m_pszDebugMethodName, masterILOffset, offsetNative));
+                    pMD->m_pszDebugClassName, pMD->m_pszDebugMethodName, primaryILOffset, offsetNative));
                 continue;
             }
 
@@ -1863,7 +1863,7 @@ BOOL DebuggerController::AddBindAndActivateILSlavePatch(DebuggerControllerPatch 
 
             INDEBUG(BOOL fOk = )
                 AddBindAndActivatePatchForMethodDesc(pMD, dji,
-                    offsetNative, PATCH_KIND_IL_SLAVE,
+                    offsetNative, PATCH_KIND_IL_REPLICA,
                     LEAF_MOST_FRAME, m_pAppDomain);
             _ASSERTE(fOk);
         }
@@ -1883,8 +1883,8 @@ BOOL DebuggerController::AddBindAndActivateILSlavePatch(DebuggerControllerPatch 
 // This routine will return FALSE only if we will _never_ be able to
 // place the patch in any native code corresponding to the given offset.
 // Otherwise it will:
-// (a) record a "master" patch
-// (b) apply as many slave patches as it can to existing copies of code
+// (a) record a "primary" patch
+// (b) apply as many replica patches as it can to existing copies of code
 //     that have debugging information
 BOOL DebuggerController::AddILPatch(AppDomain * pAppDomain, Module *module,
                                   mdMethodDef md,
@@ -1913,15 +1913,15 @@ BOOL DebuggerController::AddILPatch(AppDomain * pAppDomain, Module *module,
     {
         // OK, we either have (a) no code at all or (b) we have both JIT information and code
         //.
-        // Either way, lay down the MasterPatch.
+        // Either way, lay down the PrimaryPatch.
         //
         // MapAndBindFunctionPatches will take care of any instantiations that haven't
-        // finished JITting, by making a copy of the master breakpoint.
-        DebuggerControllerPatch *master = AddILMasterPatch(module, md, pMethodDescFilter, offset, offsetIsIL, encVersion);
+        // finished JITting, by making a copy of the primary breakpoint.
+        DebuggerControllerPatch *primary = AddILPrimaryPatch(module, md, pMethodDescFilter, offset, offsetIsIL, encVersion);
 
         // We have to keep the index here instead of the pointer.  The loop below adds more patches,
         // which may cause the patch table to grow and move.
-        ULONG masterIndex = g_patches->GetItemIndex((HASHENTRY*)master);
+        ULONG primaryIndex = g_patches->GetItemIndex((HASHENTRY*)primary);
 
         // Iterate through every existing NativeCodeBlob (with the same EnC version).
         // This includes generics + prejitted code.
@@ -1950,14 +1950,14 @@ BOOL DebuggerController::AddILPatch(AppDomain * pAppDomain, Module *module,
                 {
                     fVersionMatch = TRUE;
 
-                    master = (DebuggerControllerPatch *)g_patches->GetEntryPtr(masterIndex);
+                    primary = (DebuggerControllerPatch *)g_patches->GetEntryPtr(primaryIndex);
 
                     // <REVISIT_TODO> If we're missing JIT info for any then
                     // we won't have applied the bp to every instantiation.  That should probably be reported
                     // as a new kind of condition to the debugger, i.e. report "bp only partially applied".  It would be
                     // a shame to completely fail just because on instantiation is missing debug info: e.g. just because
                     // one component hasn't been prejitted with debugging information.</REVISIT_TODO>
-                    fOk = (AddBindAndActivateILSlavePatch(master, dji) || fOk);
+                    fOk = (AddBindAndActivateILReplicaPatch(primary, dji) || fOk);
                 }
                 it.Next();
             }
@@ -2045,7 +2045,7 @@ BOOL DebuggerController::AddBindAndActivatePatchForMethodDesc(MethodDesc *fd,
         MODE_ANY; // don't really care what mode we're in.
 
         PRECONDITION(ThisMaybeHelperThread());
-        PRECONDITION(kind != PATCH_KIND_IL_MASTER);
+        PRECONDITION(kind != PATCH_KIND_IL_PRIMARY);
     }
     CONTRACTL_END;
 

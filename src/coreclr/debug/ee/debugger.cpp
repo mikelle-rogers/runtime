@@ -4824,11 +4824,11 @@ HRESULT Debugger::MapAndBindFunctionPatches(DebuggerJitInfo *djiNew,
                 continue;
             }
 
-            // Do not copy over slave breakpoint patches.  Instead place a new slave
-            // based off the master.
-            if (dcp->IsILSlavePatch())
+            // Do not copy over replica breakpoint patches.  Instead place a new replica
+            // based off the primary.
+            if (dcp->IsILReplicaPatch())
             {
-                LOG((LF_CORDB, LL_INFO10000, "D::MABFP: Not copying over slave breakpoint patch\n"));
+                LOG((LF_CORDB, LL_INFO10000, "D::MABFP: Not copying over replica breakpoint patch\n"));
                 continue;
             }
 
@@ -4959,15 +4959,15 @@ HRESULT Debugger::MapPatchToDJI(DebuggerControllerPatch *dcp, DebuggerJitInfo *d
     // decays into BindFunctionPatch's BindPatch function
     if (djiCur->m_encVersion == djiTo->m_encVersion)
     {
-        // If the patch is a "master" then make a new "slave" patch instead of
-        // binding the old one.  This is to stop us mucking with the master breakpoint patch
+        // If the patch is a "primary" then make a new "replica" patch instead of
+        // binding the old one.  This is to stop us mucking with the primary breakpoint patch
         // which we may need to bind several times for generic code.
-        if (dcp->IsILMasterPatch())
+        if (dcp->IsILPrimaryPatch())
         {
-            LOG((LF_CORDB, LL_EVERYTHING, "D::MPTDJI Add, Bind, Activate new patch from master patch\n"));
-            if (dcp->controller->AddBindAndActivateILSlavePatch(dcp, djiTo))
+            LOG((LF_CORDB, LL_EVERYTHING, "D::MPTDJI Add, Bind, Activate new patch from primary patch\n"));
+            if (dcp->controller->AddBindAndActivateILReplicaPatch(dcp, djiTo))
             {
-                LOG((LF_CORDB, LL_INFO1000, "D::MPTDJI Applied from master patch!\n" ));
+                LOG((LF_CORDB, LL_INFO1000, "D::MPTDJI Applied from primary patch!\n" ));
                 return S_OK;
             }
             else
