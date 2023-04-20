@@ -10506,6 +10506,21 @@ bool Debugger::HandleIPCEvent(DebuggerIPCEvent * pEvent)
             GetCanary()->ClearCache();
             break;
         }
+    case DB_IPCE_DISABLE_OPS:
+        {
+            MethodDesc *pMethodDesc = g_pEEInterface->FindLoadedMethodRefOrDef(pEvent->DisableOptData.pModule.GetRawPtr(), pEvent->DisableOptData.funcMetadataToken);
+            CodeVersionManager * pCodeVersionManager = pMethodDesc->GetCodeVersionManager();
+            //Build a new NativeCodeVersion
+            //Set optimization tier
+            //set as active native code version
+            //Get active IL Version which then
+            ILCodeVersion ilVersion = pCodeVersionManager->GetActiveILCodeVersion(pMethodDesc);
+            //Gets the active native version, 
+            NativeCodeVersion nativeCodeVersion = ilVersion.GetActiveNativeCodeVersion(pMethodDesc);
+            //"Which then allows us to get the new optimizationTier 
+            nativeCodeVersion.SetOptimizationTier(NativeCodeVersion::OptimizationTierDebug);
+        }
+        break;
 
     case DB_IPCE_BREAKPOINT_ADD:
         {

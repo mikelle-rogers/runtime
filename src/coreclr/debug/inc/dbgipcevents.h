@@ -2008,6 +2008,12 @@ struct MSLAYOUT DebuggerIPCEvent
 
         struct MSLAYOUT
         {
+            mdMethodDef funcMetadataToken;
+            VMPTR_Module pModule;
+        } DisableOptData;
+
+        struct MSLAYOUT
+        {
             LSPTR_BREAKPOINT breakpointToken;
         } BreakpointSetErrorData;
 
