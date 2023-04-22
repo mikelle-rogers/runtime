@@ -1572,18 +1572,4 @@ BOOL EEDbgInterfaceImpl::AdjustContextForJITHelpersForDebugger(CONTEXT* context)
     return AdjustContextForJITHelpers(nullptr, context);
 }
 #endif
-
-// void DisableOptimizations(ICorDebugFunction5 iCorFunction)
-// {
-//     MethodDesc *pMethodDesc = g_pEEInterface->FindLoadedMethodRefOrDef(iCorFunction->GetModule(), iCorFunction->GetToken());
-//     CodeVersionManager * pCodeVersionManager = pMethodDesc->GetCodeVersionManager();
-//     pCodeVersionManager.Get
-//     //Get active IL Version which then
-//     ILCodeVersion ilVersion = pCodeVersionManager.GetActiveILCodeVersion(pMethodDesc);
-//     //Gets the active native version, 
-//     NativeCodeVersion nativeCodeVersion = ilVersion.GetActiveNativeCodeVersion(pMethodDesc);
-//     //"Which then allows us to get the new optimizationTier 
-//     nativeCodeVersion.SetOptimizationTier(OptimizationTierDebug);
-// }
-
 #endif // DEBUGGING_SUPPORTED
