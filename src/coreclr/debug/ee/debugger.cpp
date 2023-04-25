@@ -10508,17 +10508,22 @@ bool Debugger::HandleIPCEvent(DebuggerIPCEvent * pEvent)
         }
     case DB_IPCE_DISABLE_OPS:
         {
+            //get app domain get m_tierredCompilationManager
+            
+            NativeCodeVersion newNativeCodeVersion;
             MethodDesc *pMethodDesc = g_pEEInterface->FindLoadedMethodRefOrDef(pEvent->DisableOptData.pModule.GetRawPtr(), pEvent->DisableOptData.funcMetadataToken);
+            NativeCodeVersion::OptimizationTier debugTier = NativeCodeVersion::OptimizationDebug;
             CodeVersionManager * pCodeVersionManager = pMethodDesc->GetCodeVersionManager();
+            ILCodeVersion ilCodeVersion = pCodeVersionManager->GetILCodeVersion(pMethodDesc);
             //Build a new NativeCodeVersion
+            HRESULT hr = ilCodeVersion.AddNativeCodeVersion(pMethodDesc, debugTier, &newNativeCodeVersion);
+            if (FAILED(hr))
+            {
+                ThrowHR(hr);
+            }
             //Set optimization tier
             //set as active native code version
-            //Get active IL Version which then
-            ILCodeVersion ilVersion = pCodeVersionManager->GetActiveILCodeVersion(pMethodDesc);
-            //Gets the active native version, 
-            NativeCodeVersion nativeCodeVersion = ilVersion.GetActiveNativeCodeVersion(pMethodDesc);
-            //"Which then allows us to get the new optimizationTier 
-            nativeCodeVersion.SetOptimizationTier(NativeCodeVersion::OptimizationTierDebug);
+
         }
         break;
 
