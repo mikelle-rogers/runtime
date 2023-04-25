@@ -933,12 +933,27 @@ bool TieredCompilationManager::DoBackgroundWork(
 void TieredCompilationManager::OptimizeMethod(NativeCodeVersion nativeCodeVersion)
 {
     STANDARD_VM_CONTRACT;
-
+    if (nativeCodeVersion.GetOptimizationTier() == NativeCodeVersion::OptimizationTier::OptimizationDebug)
+    {
+        //If it has been changed to Debug, leave it at that optimization level
+        return;
+    }
     _ASSERTE(nativeCodeVersion.GetMethodDesc()->IsEligibleForTieredCompilation());
     if (CompileCodeVersion(nativeCodeVersion))
     {
         ActivateCodeVersion(nativeCodeVersion);
     }
+}
+
+void TieredCompilationManager::DeOptimizeMethod(NativeCodeVersion nativeCodeVersion)
+{
+    //which native code version should I be passing in? 
+    //I want to call CompileCodeVersion and ActivateCodeVersion, just like in OptimizeMethod, but I need to figure out where I need to change the optimization tier to Debug. 
+    //I need to move the code from debugger.cpp line 10512 chunk to in here
+    //debugger.cpp is in the vm
+    STANDARD_VM_CONTRACT;
+    NativeCodeVersion newNativeCodeVersion;
+    Method
 }
 
 // Compiles new optimized code for a method.
@@ -964,7 +979,7 @@ BOOL TieredCompilationManager::CompileCodeVersion(NativeCodeVersion nativeCodeVe
             nativeCodeVersion.GetVersionId(),
             pCode));
 
-        if (config->JitSwitchedToMinOpt())
+        if (config->JitSwitchedToMinOpt() && nativeCodeVersion.GetOptimizationTier() != NativeCodeVersion::OptimizationTier::OptimizationDebug)
         {
             // The JIT decided to switch to min-opts, likely due to the method being very large or complex. The rejitted code
             // may be slower if the method had been prejitted. Ignore the rejitted code and continue using the tier 0 entry
