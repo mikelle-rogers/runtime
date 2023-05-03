@@ -1094,6 +1094,11 @@ CORJIT_FLAGS TieredCompilationManager::GetJitFlags(PrepareCodeConfig *config)
                     flags.Set(CORJIT_FLAGS::CORJIT_FLAG_TIER1);
                     return flags;
                 }
+                if (currentTier == NativeCodeVersion::OptimizationTier::OptimizationTierDebug)
+                {
+                    flags.Set(CORJIT_FLAGS::CORJIT_FLAG_DEBUG_CODE);
+                    flags.Set(CORJIT_FLAGS::CORJIT_FLAG_DEBUG_INFO);
+                }
 
                 _ASSERTE(!nativeCodeVersion.IsFinalTier());
                 flags.Set(CORJIT_FLAGS::CORJIT_FLAG_TIER0);
