@@ -933,7 +933,7 @@ bool TieredCompilationManager::DoBackgroundWork(
 void TieredCompilationManager::OptimizeMethod(NativeCodeVersion nativeCodeVersion)
 {
     STANDARD_VM_CONTRACT;
-    if (nativeCodeVersion.GetOptimizationTier() == NativeCodeVersion::OptimizationTier::OptimizationDebug)
+    if (nativeCodeVersion.GetOptimizationTier() == NativeCodeVersion::OptimizationTier::OptimizationTierDebug)
     {
         //If it has been changed to Debug, leave it at that optimization level
         return;
@@ -945,15 +945,29 @@ void TieredCompilationManager::OptimizeMethod(NativeCodeVersion nativeCodeVersio
     }
 }
 
-void TieredCompilationManager::DeOptimizeMethod(NativeCodeVersion nativeCodeVersion)
+void TieredCompilationManager::DeOptimizeMethod(MethodDesc * pMethodDesc)
 {
-    //which native code version should I be passing in? 
-    //I want to call CompileCodeVersion and ActivateCodeVersion, just like in OptimizeMethod, but I need to figure out where I need to change the optimization tier to Debug. 
-    //I need to move the code from debugger.cpp line 10512 chunk to in here
     //debugger.cpp is in the vm
-    STANDARD_VM_CONTRACT;
     NativeCodeVersion newNativeCodeVersion;
-    Method
+    
+    NativeCodeVersion::OptimizationTier debugTier = NativeCodeVersion::OptimizationTierDebug;
+    CodeVersionManager * pCodeVersionManager = pMethodDesc->GetCodeVersionManager();
+    ILCodeVersion ilCodeVersion = pCodeVersionManager->GetActiveILCodeVersion(pMethodDesc);
+    //Build a new NativeCodeVersion
+    HRESULT hr = ilCodeVersion.AddNativeCodeVersion(pMethodDesc, debugTier, &newNativeCodeVersion);
+    if (FAILED(hr))
+    {
+        printf("The thing failed with hr and add native code version.");
+    }
+    STANDARD_VM_CONTRACT;//What is this here for? 
+    if (CompileCodeVersion(newNativeCodeVersion))
+    {
+        ActivateCodeVersion(newNativeCodeVersion);
+    }
+    else
+    {
+        printf("CompileCodeVersion returned false.");
+    }
 }
 
 // Compiles new optimized code for a method.
@@ -979,7 +993,7 @@ BOOL TieredCompilationManager::CompileCodeVersion(NativeCodeVersion nativeCodeVe
             nativeCodeVersion.GetVersionId(),
             pCode));
 
-        if (config->JitSwitchedToMinOpt() && nativeCodeVersion.GetOptimizationTier() != NativeCodeVersion::OptimizationTier::OptimizationDebug)
+        if (config->JitSwitchedToMinOpt() && nativeCodeVersion.GetOptimizationTier() != NativeCodeVersion::OptimizationTier::OptimizationTierDebug)
         {
             // The JIT decided to switch to min-opts, likely due to the method being very large or complex. The rejitted code
             // may be slower if the method had been prejitted. Ignore the rejitted code and continue using the tier 0 entry
