@@ -636,7 +636,7 @@ HRESULT CordbFunction::DisableOptimizations()
     _ASSERTE (pAppDomain != NULL);
 
     pProcess->InitIPCEvent(pEvent, DB_IPCE_DISABLE_OPS, true, pAppDomain->GetADToken());
-    GetToken(&pEvent->DisableOptData.funcMetadataToken); 
+    pEvent->DisableOptData.funcMetadataToken = m_MDToken;
     pEvent->DisableOptData.pModule = m_pModule->GetRuntimeModule();
 
     lockHolder.Release();
