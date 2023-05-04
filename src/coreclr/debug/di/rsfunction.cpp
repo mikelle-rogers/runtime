@@ -626,7 +626,7 @@ HRESULT CordbFunction::DisableOptimizations()
     HRESULT hr;
     PUBLIC_API_ENTRY(this);
     FAIL_IF_NEUTERED(this);
-
+    ATT_REQUIRE_STOPPED_MAY_FAIL(GetProcess());
     CordbProcess * pProcess = GetProcess();
     RSLockHolder lockHolder(pProcess->GetProcessLock());
     pProcess->ClearPatchTable();
