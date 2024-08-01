@@ -59,6 +59,7 @@ static MethodDesc* getTargetMethodDesc(PCODE target)
         (stubKind == STUB_CODE_BLOCK_VSD_LOOKUP_STUB) ||
         (stubKind == STUB_CODE_BLOCK_VSD_VTABLE_STUB))
     {
+        LOG((LF_CORDB, LL_INFO10000, "getTargetMethodDesc calls StubManager::FindStubManager\n"));
         VirtualCallStubManager *pVSDStubManager = VirtualCallStubManager::FindStubManager(target, &stubKind);
         if (pVSDStubManager != NULL)
         {

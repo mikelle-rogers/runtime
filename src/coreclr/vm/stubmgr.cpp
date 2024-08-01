@@ -33,6 +33,7 @@ const char *GetTType( TraceType tt)
 
 void LogTraceDestination(const char * szHint, PCODE stubAddr, TraceDestination * pTrace)
 {
+    //LOG((LF_CORDB, LL_EVERYTHING,"LogTraceDestination: pTrace->GetAddress() (address) =%p, stubAddr (input) =%p\n", pTrace->GetAddress(), stubAddr));
     LIMITED_METHOD_CONTRACT;
     if (pTrace->GetTraceType() == TRACE_UNJITTED_METHOD)
     {
@@ -43,7 +44,7 @@ void LogTraceDestination(const char * szHint, PCODE stubAddr, TraceDestination *
     }
     else
     {
-        LOG((LF_CORDB, LL_INFO10000, "'%s' yields '%s' to address %p for input %p.\n",
+        LOG((LF_CORDB, LL_INFO10000, "'%s' yields adding to see if it changes '%s' to address %p for input %p.\n",
             szHint, GetTType(pTrace->GetTraceType()),
             pTrace->GetAddress(), stubAddr));
     }
@@ -388,7 +389,7 @@ BOOL StubManager::IsSingleOwner(PCODE stubAddress, StubManager * pOwner)
 
         if (it.Current() == pOwner)
             ownerFound = true;
-
+        LOG((LF_CORDB, LL_INFO10000, "StubManager::IsSingleOwner about to call CheckIsStub_Worker  %p\n", stubAddress));
         if (it.Current()->CheckIsStub_Worker(stubAddress))
         {
             // If you hit this assert, you can tell what 2 stub managers are conflicting by inspecting their vtable.
@@ -424,7 +425,7 @@ BOOL StubManager::CheckIsStub_Worker(PCODE stubStartAddress)
     CONTRACTL_END;
 
     SUPPORTS_DAC;
-
+    LOG((LF_CORDB, LL_INFO10000, "StubManager::CheckIsStub_Worker beginning stubStartAddress %p\n", stubStartAddress));
     // @todo - consider having a single check for null right up front.
     // Though this may cover bugs where stub-managers don't handle bad addresses.
     // And someone could just as easily pass (0x01) as NULL.
@@ -502,6 +503,7 @@ PTR_StubManager StubManager::FindStubManager(PCODE stubAddress)
     StubManagerIterator it;
     while (it.Next())
     {
+        LOG((LF_CORDB, LL_INFO10000, "StubManager::FindStubManager about to call CheckIsStub_Worker with address %p\n", stubAddress));
         if (it.Current()->CheckIsStub_Worker(stubAddress))
         {
             _ASSERTE_IMPL(IsSingleOwner(stubAddress, it.Current()));
@@ -524,19 +526,25 @@ PTR_StubManager StubManager::FindStubManager(PCODE stubAddress)
 BOOL StubManager::TraceStub(PCODE stubStartAddress, TraceDestination *trace)
 {
     WRAPPER_NO_CONTRACT;
-
+    LOG((LF_CORDB, LL_INFO10000, "StubManager::TraceStub beginning stubStartAddress %p\n", stubStartAddress));
     StubManagerIterator it;
     while (it.Next())
     {
         StubManager * pCurrent = it.Current();
+        LOG((LF_CORDB, LL_INFO10000,
+             "StubManager::TraceStub: '%s' (%p) checking changes %p.\n", pCurrent->DbgGetName(), pCurrent, stubStartAddress));
+        LOG((LF_CORDB, LL_INFO10000, "StubManager::TraceStub about to call CheckIsStub_Worker with %p\n", stubStartAddress));
         if (!pCurrent->CheckIsStub_Worker(stubStartAddress))
             continue;
 
+        // LOG((LF_CORDB, LL_INFO10000,
+        //         "StubManager::TraceStub: '%s' (%p) claimed %p.\n", pCurrent->DbgGetName(), pCurrent, stubStartAddress));
         LOG((LF_CORDB, LL_INFO10000,
-                "StubManager::TraceStub: '%s' (%p) claimed %p.\n", pCurrent->DbgGetName(), pCurrent, stubStartAddress));
+                 "StubManager::TraceStub: '%s' (%p) claimed %p.\n", pCurrent->DbgGetName(), pCurrent, stubStartAddress));
 
         _ASSERTE_IMPL(IsSingleOwner(stubStartAddress, pCurrent));
-
+        LOG((LF_CORDB, LL_INFO10000, "StubManager::TraceStub right before DoTraceStub stubStartAddress: %p\n", stubStartAddress));
+        //((LF_CORDB, LL_EVERYTHING, "StubManager::TraceStub trace->GetAddress() %p\n", trace->GetAddress()));
         BOOL fValid = pCurrent->DoTraceStub(stubStartAddress, trace);
 #ifdef _DEBUG
         if (IsStubLoggingEnabled())
@@ -557,7 +565,7 @@ BOOL StubManager::TraceStub(PCODE stubStartAddress, TraceDestination *trace)
 #endif
         return fValid;
     }
-
+    //((LF_CORDB, LL_EVERYTHING, "StubManager::TraceStub after DoTraceStub stubStartAddress %p\n", stubStartAddress));
     if (ExecutionManager::IsManagedCode(stubStartAddress))
     {
         LOG((LF_CORDB, LL_INFO10000,
@@ -1005,7 +1013,8 @@ BOOL PrecodeStubManager::DoTraceStub(PCODE stubStartAddress,
     }
     CONTRACTL_END
 
-    LOG((LF_CORDB, LL_EVERYTHING, "PrecodeStubManager::DoTraceStub called\n"));
+    //LOG((LF_CORDB, LL_EVERYTHING, "PrecodeStubManager::DoTraceStub called\n"));
+    LOG((LF_CORDB, LL_EVERYTHING, "PrecodeStubManager::DoTraceStub called %p\n", stubStartAddress));
 
     MethodDesc* pMD = NULL;
 
@@ -1019,7 +1028,10 @@ BOOL PrecodeStubManager::DoTraceStub(PCODE stubStartAddress,
         }
 
         PREFIX_ASSUME(pPrecode != NULL);
-
+        LOG((LF_CORDB, LL_EVERYTHING, "pPrecode=%p\n", pPrecode));
+        LOG((LF_CORDB, LL_EVERYTHING, "pPrecode->GetType()=%u\n", pPrecode->GetType()));
+        LOG((LF_CORDB, LL_EVERYTHING, "pPrecode->GetTarget()=%p\n", pPrecode->GetTarget()));
+        LOG((LF_CORDB, LL_EVERYTHING, "pPrecode->GetMethodDesc()=%p\n", pPrecode->GetMethodDesc()));
         switch (pPrecode->GetType())
         {
         case PRECODE_STUB:
@@ -1056,6 +1068,7 @@ BOOL PrecodeStubManager::DoTraceStub(PCODE stubStartAddress,
         // check if the method has been jitted
         if (!pPrecode->IsPointingToPrestub(target))
         {
+            LOG((LF_CORDB, LL_EVERYTHING, "Method has been jitted. pPrecode->IsPointingToPrestub(target)=FALSE, calling trace->InitForStub(target)\n"));
             trace->InitForStub(target);
             LOG_TRACE_DESTINATION(trace, stubStartAddress, "PrecodeStubManager::DoTraceStub - code");
             return TRUE;
@@ -1065,6 +1078,12 @@ BOOL PrecodeStubManager::DoTraceStub(PCODE stubStartAddress,
     }
 
     PREFIX_ASSUME(pMD != NULL);
+    LOG((LF_CORDB, LL_EVERYTHING, "pMD=%p\n", pMD));
+    LOG((LF_CORDB, LL_EVERYTHING,
+            "pMD = %s::%s SIG %s\n",
+            pMD->m_pszDebugClassName,
+            pMD->m_pszDebugMethodName,
+            pMD->m_pszDebugMethodSignature));
 
     // If the method is not IL, then we patch the prestub because no one will ever change the call here at the
     // MethodDesc. If, however, this is an IL method, then we are at risk to have another thread backpatch the call
@@ -1072,10 +1091,12 @@ BOOL PrecodeStubManager::DoTraceStub(PCODE stubStartAddress,
     // by using TRACE_UNJITTED_METHOD.
     if (!pMD->IsIL() && !pMD->IsILStub())
     {
+        LOG((LF_CORDB, LL_EVERYTHING, "Method is not IL.\n"));
         trace->InitForStub(GetPreStubEntryPoint());
     }
     else
     {
+        LOG((LF_CORDB, LL_EVERYTHING, "Method is IL but not yet JIT'd. Calling trace->InitForUnjittedMethod(pMD).\n"));
         trace->InitForUnjittedMethod(pMD);
     }
 
@@ -1141,7 +1162,7 @@ BOOL StubLinkStubManager::TraceDelegateObject(BYTE* pbDel, TraceDestination *tra
     CONTRACTL_END;
 
     BYTE **ppbDest;
-
+    //((LF_CORDB, LL_EVERYTHING, "StubLinkStubManager::TraceDelegateObject I think we should be here at some point\n"));
     // If we got here, then we're here b/c we're at the start of a delegate stub
     // need to figure out the kind of delegates we are dealing with.
     BYTE *pbDelInvocationList = *(BYTE **)(pbDel + DelegateObject::GetOffsetOfInvocationList());
@@ -1364,6 +1385,7 @@ static BOOL TraceManagedThunk(
 
         orDelegate = (DELEGATEREF)ObjectToOBJECTREF(StubManagerHelpers::GetThisPtr(pContext));
         destAddr = orDelegate->GetMethodPtr();
+        //LOG((LF_CORDB,LL_INFO10000, "We should not be here ever\n"));
         if (StubManager::TraceStub(destAddr, trace))
         {
             LOG((LF_CORDB,LL_INFO10000, "TraceManagedThunk: ppbDest: %p\n", destAddr));
@@ -1792,24 +1814,34 @@ BOOL ILStubManager::DoTraceStub(PCODE stubStartAddress,
 {
     LIMITED_METHOD_CONTRACT;
 
-    LOG((LF_CORDB, LL_EVERYTHING, "ILStubManager::DoTraceStub called\n"));
+    //LOG((LF_CORDB, LL_EVERYTHING, "ILStubManager::DoTraceStub called\n"));
+    LOG((LF_CORDB, LL_INFO10000, "ILStubManager::DoTraceStub called %p\n", stubStartAddress));
 
 #ifndef DACCESS_COMPILE
 
     PCODE traceDestination = (PCODE)NULL;
 
     MethodDesc* pStubMD = ExecutionManager::GetCodeMethodDesc(stubStartAddress);
+    //LOG((LF_CORDB, LL_EVERYTHING, "ILStubManager::DoTraceStub methodDesc %p\n", *pStubMD));
     if (pStubMD != NULL && pStubMD->AsDynamicMethodDesc()->IsMulticastStub())
     {
+        #if defined(TARGET_ARM64) //&& defined(OSX)
+        // On ARM64 Mac, we cannot currently put a breakpoint inside of MulticastDebuggerTraceHelper
+        LOG((LF_CORDB, LL_INFO10000, "ILStubManager::DoTraceStub got traceDestination %p, from MulticastDebuggerTraceHelper\n", traceDestination));
+        return FALSE;
+        #else
         traceDestination = GetEEFuncEntryPoint(StubHelpers::MulticastDebuggerTraceHelper);
+        LOG((LF_CORDB, LL_INFO10000, "ILStubManager::DoTraceStub got traceDestination %p, from GetEEFuncEntryPoint\n", traceDestination));
+        #endif
     }
     else
     {
         // This call is going out to unmanaged code, either through pinvoke or COM interop.
         traceDestination = stubStartAddress;
     }
-
+    LOG((LF_CORDB, LL_INFO10000, "ILStubManager::DoTraceStub traceDestination (should become trace->GetAddress()) %p\n", traceDestination));
     trace->InitForManagerPush(traceDestination, this);
+    //((LF_CORDB, LL_EVERYTHING, "ILStubManager::DoTraceStub trace->GetAddress() %p\n", trace->GetAddress()));
     LOG_TRACE_DESTINATION(trace, traceDestination, "ILStubManager::DoTraceStub");
 
     return TRUE;

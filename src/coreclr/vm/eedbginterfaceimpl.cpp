@@ -1184,7 +1184,7 @@ bool EEDbgInterfaceImpl::TraceStub(const BYTE *ip,
         GC_NOTRIGGER;
     }
     CONTRACTL_END;
-
+    //LOG((LF_CORDB,LL_INFO10000, "EEdbgInterfaceImpl::TraceStub: %p\n", (PCODE) ip));
     return StubManager::TraceStub((PCODE) ip, trace) != FALSE;
 #else
     DacNotImpl();

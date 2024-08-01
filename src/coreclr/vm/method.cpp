@@ -548,12 +548,19 @@ PCODE MethodDesc::GetMethodEntryPoint()
     // synchronized
 
     // Keep implementations of MethodDesc::GetMethodEntryPoint, MethodDesc::GetMethodEntryPointIfExists, and MethodDesc::GetAddrOfSlot in sync!
-
+    LOG((LF_CORDB, LL_EVERYTHING,
+             "MethodDesc::GetMethodEntryPoint pMD = %p %s::%s SIG %s, classification: %d\n",
+             this,
+             this->m_pszDebugClassName,
+             this->m_pszDebugMethodName,
+             this->m_pszDebugMethodSignature,
+             GetClassification()));
     if (HasNonVtableSlot())
     {
         SIZE_T size = GetBaseSize();
 
         TADDR pSlot = dac_cast<TADDR>(this) + size;
+        LOG((LF_CORDB, LL_EVERYTHING, "MethodDesc::GetMethodEntryPoint this=%p size=%p - returning %p[%p]\n", this, size, pSlot, (pSlot != 0) ? *(TADDR*)pSlot : 0));
 
         if (*PTR_PCODE(pSlot) == (PCODE)NULL)
         {
@@ -3187,7 +3194,15 @@ void MethodDesc::SetMethodEntryPoint(PCODE addr)
     // Similarly to GetMethodEntryPoint(), it is up to the caller to ensure that calls to this function are appropriately
     // synchronized. Currently, the only caller synchronizes with the following lock.
     _ASSERTE(MethodDescBackpatchInfoTracker::IsLockOwnedByCurrentThread());
+    LOG((LF_CORDB, LL_EVERYTHING,
+         "MethodDesc::SetMethodEntryPoint pMD = %p %s::%s SIG %s, precode type: %d\n",
+         this,
+         this->m_pszDebugClassName,
+         this->m_pszDebugMethodName,
+         this->m_pszDebugMethodSignature,
+         GetClassification()));
 
+     LOG((LF_CORDB, LL_EVERYTHING, "MethodDesc::SetMethodEntryPoint addr=%p GetAddrOfSlot()=%p\n", addr, GetAddrOfSlot()));
     *GetAddrOfSlot() = addr;
 }
 

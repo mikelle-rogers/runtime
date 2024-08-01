@@ -169,6 +169,7 @@ void ArmSingleStepper::Bypass(DWORD ip, WORD opcode1, WORD opcode2)
 
 void ArmSingleStepper::Apply(T_CONTEXT *pCtx)
 {
+    LOG((LF_CORDB, LL_EVERYTHING, "ArmSS: at the beginning of the method.\n"));
     if (m_rgCode == NULL)
     {
         Init();

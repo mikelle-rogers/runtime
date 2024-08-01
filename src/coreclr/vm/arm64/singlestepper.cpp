@@ -114,6 +114,7 @@ void Arm64SingleStepper::Bypass(uint64_t ip, uint32_t opcode)
 
 void Arm64SingleStepper::Apply(T_CONTEXT *pCtx)
 {
+    LOG((LF_CORDB, LL_EVERYTHING, "A64SS: at the beginning of the method.\n"));
     if (m_rgCode == NULL)
     {
         Init();
@@ -276,7 +277,7 @@ bool Arm64SingleStepper::Fixup(T_CONTEXT *pCtx, DWORD dwExceptionCode)
         {
             if (m_rgCode[0] != kBreakpointOp)
             {
-                LOG((LF_CORDB, LL_INFO100000, "Arm64SingleStepper::Fixup executed code, ip = %lx\n", m_targetPc));
+                //LOG((LF_CORDB, LL_INFO100000, "Arm64SingleStepper::Fixup executed code, ip = %x\n", m_targetPc));
 
                 pCtx->Pc = m_targetPc;
             }
@@ -285,7 +286,7 @@ bool Arm64SingleStepper::Fixup(T_CONTEXT *pCtx, DWORD dwExceptionCode)
                 // We've hit a breakpoint in the code stream.  We will return false here (which causes us to NOT
                 // replace the breakpoint code with single step), and place the Pc back to the original Pc.  The
                 // debugger patch skipping code will move past this breakpoint.
-                LOG((LF_CORDB, LL_INFO100000, "Arm64SingleStepper::Fixup emulated breakpoint\n"));
+                //LOG((LF_CORDB, LL_INFO100000, "Arm64SingleStepper::Fixup emulated breakpoint\n"));
                 pCtx->Pc = m_originalPc;
 
                 _ASSERTE((pCtx->Pc & 0x3) == 0);

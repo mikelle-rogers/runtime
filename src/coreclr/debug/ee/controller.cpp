@@ -1237,6 +1237,7 @@ bool DebuggerController::BindPatch(DebuggerControllerPatch *patch,
 
     if (patch->address != NULL)
     {
+        LOG((LF_CORDB,LL_INFO10000, "DC::BP: Patch patch address = %p,\n", patch->address));
         return true;
     }
 
@@ -2074,6 +2075,7 @@ BOOL DebuggerController::AddBindAndActivatePatchForMethodDesc(MethodDesc *fd,
 
     if (DebuggerController::BindPatch(patch, fd, NULL))
     {
+        LOG((LF_CORDB|LF_ENC,LL_INFO10000,"DC::ABAAPFMD: BindPatch returned true, so we are returning true from AddBindAncActivatePatchForMethodDesc\n"));
         DebuggerController::ActivatePatch(patch);
         ok = TRUE;
     }
@@ -2520,7 +2522,7 @@ DebuggerPatchSkip *DebuggerController::ActivatePatchSkip(Thread *thread,
         skip = new (interopsafe) DebuggerPatchSkip(thread, patch);
         TRACE_ALLOC(skip);
     }
-
+    LOG((LF_CORDB,LL_INFO10000, "DC::APS: Returning skip==NULL %d\n", skip == NULL));
     return skip;
 }
 
@@ -2735,13 +2737,14 @@ DPOSS_ACTION DebuggerController::ScanForTriggers(CORDB_ADDRESS_TYPE *address,
                 {
                     // by now, we should already know that we care for this exception.
                     _ASSERTE(IsInUsedAction(used) == true);
-
+                    LOG((LF_CORDB,LL_INFO10000, "DS::SFT: used == DPOSS_USED_WITH_NO_EVENT %d\n", used == DPOSS_USED_WITH_NO_EVENT));
                     // now we are sure that we will send event to the RS
                     used = DPOSS_USED_WITH_EVENT;
                     pDcq->dcqEnqueue(p, FALSE); // <REVISIT_TODO>@todo Return value</REVISIT_TODO>
 
                 }
             }
+            LOG((LF_CORDB,LL_INFO10000, "DS::SFT: One controller!\n"));
 
             p = pNext;
         }
@@ -2756,8 +2759,10 @@ DPOSS_ACTION DebuggerController::ScanForTriggers(CORDB_ADDRESS_TYPE *address,
         p = g_controllers;
         while (p != NULL)
         {
+            LOG((LF_CORDB,LL_INFO10000, "DS::SFT: Going through steppers that are not null!\n"));
             if (p->m_thread == thread && p->m_singleStep)
             {
+                LOG((LF_CORDB,LL_INFO10000, "DS::SFT: we found a stepper still active for this thread.!\n"));
                 ApplyTraceFlag(thread);
                 break;
             }
@@ -2786,6 +2791,7 @@ DPOSS_ACTION DebuggerController::ScanForTriggers(CORDB_ADDRESS_TYPE *address,
         LOG((LF_CORDB|LF_ENC,LL_INFO1000,"DC:GEnCP address is managed code\n"));
         DebuggerJitInfo *dji = g_pDebugger->GetJitInfoFromAddr((TADDR) address);
         if (dji == NULL)
+            LOG((LF_CORDB|LF_ENC,LL_INFO1000,"DC:GEnCP dji was NULl returning\n"));
             return NULL;
 
         dji->LogInstance();
@@ -2797,6 +2803,7 @@ DPOSS_ACTION DebuggerController::ScanForTriggers(CORDB_ADDRESS_TYPE *address,
         if (! dji->m_encBreakpointsApplied
             && (dji->m_encVersion == CorDB_DEFAULT_ENC_FUNCTION_VERSION))
         {
+            LOG((LF_CORDB|LF_ENC,LL_INFO1000,"DC:GEnCP returning NULL\n"));
             return NULL;
         }
     }
@@ -2918,14 +2925,14 @@ DPOSS_ACTION DebuggerController::DispatchPatchOrSingleStep(Thread *thread, CONTE
 
     used = ScanForTriggers((CORDB_ADDRESS_TYPE *)address, thread, context, &dcq, which, &tpr);
 
-    LOG((LF_CORDB|LF_ENC, LL_EVERYTHING, "DC::DPOSS ScanForTriggers called and returned.\n"));
+    LOG((LF_CORDB|LF_ENC, LL_EVERYTHING, "DC::DPOSS ScanForTriggers called and returned: address:%p.\n", address));
 
 
     // If we setip, then that will change the address in the context.
     // Remeber the old address so that we can compare it to the context's ip and see if it changed.
     // If it did change, then don't dispatch our current event.
     originalAddress = (TADDR) address;
-
+    LOG((LF_CORDB, LL_EVERYTHING, "DC::DPOSS originalAddress: %p.\n", originalAddress));
 #ifdef _DEBUG
     // If we do a SetIP after this point, the value of address will be garbage.  Set it to a distictive pattern now, so
     // we don't accidentally use what will (98% of the time) appear to be a valid value.
@@ -2934,6 +2941,7 @@ DPOSS_ACTION DebuggerController::DispatchPatchOrSingleStep(Thread *thread, CONTE
 
     if (dcq.dcqGetCount()> 0)
     {
+        LOG((LF_CORDB,LL_INFO1000,"DC:DPOSS: dcqGetCount = %p\n", dcq.dcqGetCount()));
         lockController.Release();
 
         // Mark if we're at an unsafe place.
@@ -2985,7 +2993,7 @@ DPOSS_ACTION DebuggerController::DispatchPatchOrSingleStep(Thread *thread, CONTE
         }
 
         SENDIPCEVENT_END;
-
+        LOG((LF_CORDB, LL_EVERYTHING, "DC::DPOSS After the events were sent\n"));
         if (!atSafePlace)
             g_pDebugger->DecThreadsAtUnsafePlaces();
 
@@ -3025,7 +3033,7 @@ Exit:
 #endif
 
     ActivatePatchSkip(thread, dac_cast<PTR_CBYTE>(GetIP(pCtx)), FALSE);
-
+    LOG((LF_CORDB|LF_ENC,LL_INFO10000, "DC::DPOSS Calld ActivatePatchSkip\n"));
     lockController.Release();
 
 
@@ -3053,7 +3061,7 @@ Exit:
         }
 
     }
-
+    LOG((LF_CORDB, LL_INFO10000, "DC::DPOSS: returning 0x%x as used\n",used));
     RETURN used;
 }
 
@@ -4244,6 +4252,7 @@ bool DebuggerController::DispatchNativeException(EXCEPTION_RECORD *pException,
                                         (SCAN_TRIGGER)(ST_PATCH|ST_SINGLE_STEP));
                 // We pass patch | single step since single steps actually
                 // do both (eg, you SS onto a breakpoint).
+             LOG((LF_CORDB, LL_EVERYTHING, "DC::DNE DispatchPatch call returned from SINgleStep\n"));
             break;
 
         default:
@@ -4281,6 +4290,7 @@ bool DebuggerController::DispatchNativeException(EXCEPTION_RECORD *pException,
     }
 
 #ifdef FEATURE_EMULATE_SINGLESTEP
+     LOG((LF_CORDB, LL_EVERYTHING, "DC::DNE FEATURE_EMULATE_SINGLESTEP is defined\n"));
     if (pCurThread->IsSingleStepEnabled())
         pCurThread->ApplySingleStep(pContext);
 #endif // FEATURE_EMULATE_SINGLESTEP
@@ -4995,8 +5005,15 @@ bool DebuggerStepper::ShouldContinueStep( ControllerStackInfo *info,
         // over it or stop
         if ( interestingMappings )
         {
+            LOG((LF_CORDB,LL_INFO10000,
+             "DeSt::ShContSt: interestingMappins is true, so we might be in a prolog, epilog%x\n"));
+
             if ( interestingMappings & m_rgfMappingStop )
+            {   
+                LOG((LF_CORDB,LL_INFO10000,
+                 "DeSt::ShContSt: interestingMappings & m_rgfMappingStop is true, so we should return false\n"));
                 return false;
+            }
             else
                 return true;
         }
@@ -5494,6 +5511,7 @@ void DebuggerStepper::EnableJMCBackStop(MethodDesc * pStartMethod)
 
     // We don't want traditional steppers to rely on MethodEnter (b/c it's not guaranteed to be correct),
     // but it may be a useful last resort.
+    LOG((LF_CORDB,LL_INFO1000,"DS::EJMCBS called EnableMEthodEnter which isn't guaranteed to be correct\n"));
     this->EnableMethodEnter();
 }
 
@@ -5552,11 +5570,12 @@ bool DebuggerStepper::TrapStepInHelper(
         // If we can't figure out where the stepper should call into (likely because we can't find a stub-manager),
         // then enable the JMC backstop.
         EnableJMCBackStop(pInfo->m_activeFrame.md);
-
+        LOG((LF_CORDB,LL_INFO1000,"DS::TSIH enabled the JMCBackStop!!\n"));
     }
 
     // We ignore ipNext here. Instead we'll return false and let the caller (TrapStep)
     // set the patch for us.
+    LOG((LF_CORDB,LL_INFO1000,"DS::TSIH will return false now.\n"));
     return false;
 }
 
@@ -5861,6 +5880,7 @@ bool DebuggerStepper::TrapStep(ControllerStackInfo *info, bool in)
                     {
                         if (TrapStepInHelper(info, walker.GetNextIP(), walker.GetSkipIP(), fCallingIntoFunclet, fIsJump))
                         {
+                            LOG((LF_CORDB, LL_INFO10000, "DS::TS: Stepping into funclet.TSIH\n"));
                             return true;
                         }
                     }
@@ -5875,7 +5895,7 @@ bool DebuggerStepper::TrapStep(ControllerStackInfo *info, bool in)
                     return true;
                 }
 
-
+                LOG((LF_CORDB,LL_INFO10000, "DC::TS:Imm:WALK_CALL new one ip=%p nextip=%p skipip=%p\n", walker.GetIP(), walker.GetNextIP(), walker.GetSkipIP()));
                 LOG((LF_CORDB,LL_INFO100000, "DC::TS:Imm:WALK_CALL Skip instruction\n"));
                 walker.Skip();
                 break;
@@ -5937,6 +5957,7 @@ bool DebuggerStepper::TrapStep(ControllerStackInfo *info, bool in)
         if (!IsInRange(offset, range, rangeCount)
             && !ShouldContinueStep( info, offset ))
         {
+            LOG((LF_CORDB, LL_INFO1000, "#1 ABAANMP (natOff:0x%x)\n", offset));
             AddBindAndActivateNativeManagedPatch(info->m_activeFrame.md,
                      ji,
                      offset,
@@ -5956,6 +5977,7 @@ bool DebuggerStepper::TrapStep(ControllerStackInfo *info, bool in)
             // we'll single step rather than TrapStepOut. If we see a return in the
             // code stream, then we'll set a breakpoint there, so that we can
             // examine the return address, and decide whether to SS or TSO then
+            LOG((LF_CORDB, LL_INFO1000, "#2 ABAANMP (natOff:0x%x)\n", offset));
             AddBindAndActivateNativeManagedPatch(info->m_activeFrame.md,
                      ji,
                      offset,
@@ -5974,6 +5996,7 @@ bool DebuggerStepper::TrapStep(ControllerStackInfo *info, bool in)
                 LOG((LF_CORDB, LL_INFO10000, "DS::TS: WALK_CALL IsAddrWithinFrame, Adding Patch.\n"));
 
                 // How else to detect this?
+                LOG((LF_CORDB, LL_INFO1000, "#3 ABAANMP (natOff:0x%x)\n", offset));
                 AddBindAndActivateNativeManagedPatch(info->m_activeFrame.md,
                          ji,
                          CodeRegionInfo::GetCodeRegionInfo(ji, info->m_activeFrame.md).AddressToOffset(walker.GetNextIP()),
@@ -5986,6 +6009,7 @@ bool DebuggerStepper::TrapStep(ControllerStackInfo *info, bool in)
             {
                 if (!in)
                 {
+                    LOG((LF_CORDB, LL_INFO1000, "#4 ABAANMP (natOff:0x%x)\n", offset));
                     AddBindAndActivateNativeManagedPatch(info->m_activeFrame.md,
                                                          ji,
                                                          offset,
@@ -6004,6 +6028,7 @@ bool DebuggerStepper::TrapStep(ControllerStackInfo *info, bool in)
                 if (walker.GetNextIP() == NULL)
                 {
                     LOG((LF_CORDB, LL_INFO10000, "DS::TS: WALK_CALL NextIP == NULL\n"));
+                    LOG((LF_CORDB, LL_INFO1000, "#5 ABAANMP (natOff:0x%x)\n", offset));
                     AddBindAndActivateNativeManagedPatch(info->m_activeFrame.md,
                              ji,
                              offset,
@@ -6019,6 +6044,7 @@ bool DebuggerStepper::TrapStep(ControllerStackInfo *info, bool in)
 
                 if (TrapStepInHelper(info, walker.GetNextIP(), walker.GetSkipIP(), fCallingIntoFunclet, false))
                 {
+                    LOG((LF_CORDB, LL_INFO10000, "DS::TS: We are in this TSIH.\n"));
                     return true;
                 }
 
@@ -6027,6 +6053,7 @@ bool DebuggerStepper::TrapStep(ControllerStackInfo *info, bool in)
             LOG((LF_CORDB, LL_INFO10000, "DS::TS: WALK_CALL Calling GetSkipIP\n"));
             if (walker.GetSkipIP() == NULL)
             {
+                LOG((LF_CORDB, LL_INFO1000, "#6 ABAANMP (natOff:0x%x)\n", offset));
                 AddBindAndActivateNativeManagedPatch(info->m_activeFrame.md,
                          ji,
                          offset,
@@ -6046,6 +6073,7 @@ bool DebuggerStepper::TrapStep(ControllerStackInfo *info, bool in)
         default:
             if (walker.GetNextIP() == NULL)
             {
+                LOG((LF_CORDB, LL_INFO1000, "#7 ABAANMP (natOff:0x%x)\n", offset));
                 AddBindAndActivateNativeManagedPatch(info->m_activeFrame.md,
                     ji,
                     offset,
@@ -7249,6 +7277,7 @@ void DebuggerStepper::TriggerMethodEnter(Thread * thread,
         pDesc, ip));
 
     // JMC steppers won't stop in Lightweight codegen (LCG). Just return & keep executing.
+    LOG((LF_CORDB, LL_INFO10000, "DS::TME, LCG\n"));
     if (pDesc->IsNoMetadata())
     {
         LOG((LF_CORDB, LL_INFO100000, "DS::TME, skipping b/c it's dynamic code (LCG)\n"));
@@ -7259,8 +7288,10 @@ void DebuggerStepper::TriggerMethodEnter(Thread * thread,
     // executing in an IL stub, or in one of the marshaling methods called by the IL stub.
     // The problem is that the IL stub can call into arbitrary code, including custom marshalers.
     // In that case the user has to put a breakpoint to stop in the code.
+    LOG((LF_CORDB, LL_INFO10000, "DS::TME, will we detect il stubs?\n"));
     if (g_pEEInterface->DetectHandleILStubs(thread))
     {
+        LOG((LF_CORDB, LL_INFO10000, "DS::TME, DetectedILStubs\n"));
         return;
     }
 
@@ -7269,8 +7300,10 @@ void DebuggerStepper::TriggerMethodEnter(Thread * thread,
     // we add a knob that lets us skip the MethodEnter checks. This lets tests directly
     // go against the Stub-managers w/o the MethodEnter check backstops.
     int fSkip = CLRConfig::GetConfigValue(CLRConfig::INTERNAL_DbgSkipMEOnStep);
+    LOG((LF_CORDB, LL_INFO10000, "DS::TME, GotConfigValue\n"));
     if (fSkip)
     {
+        LOG((LF_CORDB, LL_INFO10000, "DS::TME, returning because of fSkip\n"));
         return;
     }
 
@@ -7278,16 +7311,21 @@ void DebuggerStepper::TriggerMethodEnter(Thread * thread,
     // the assert if we end up in the method we started in (which could happen if we trace call
     // instructions before the JMC probe).
     // m_StepInStartMethod may be null (if this step-in didn't start from managed code).
+    LOG((LF_CORDB, LL_INFO10000, "DS::TME, mStepInStartMethod to be called\n"));
     if ((m_StepInStartMethod != pDesc) &&
         (!m_StepInStartMethod->IsLCGMethod()))
     {
+        LOG((LF_CORDB, LL_INFO10000, "DS::TME, in the if statement\n"));
         // Since normal step-in should stop us at the prolog, and TME is after the prolog,
         // if a stub-manager did successfully find the address, we should get a TriggerPatch first
         // at native offset 0 (before the prolog) and before we get the TME. That means if
         // we do get the TME, then there was no stub-manager to find us.
 
         SString sLog;
+        LOG((LF_CORDB, LL_INFO10000, "DS::TME, right before the DbgGetLog\n"));
         StubManager::DbgGetLog(&sLog);
+        LOG((LF_CORDB, LL_INFO10000, "DS::TME, after\n"));
+        LOG((LF_CORDB, LL_INFO10000, "DS::TME, after the DbgGetLog startMethod='%s::%s', The thread is now in managed method '%s::%s'\n",((m_StepInStartMethod == NULL) ? "unknown" : m_StepInStartMethod->m_pszDebugClassName), ((m_StepInStartMethod == NULL) ? "unknown" : m_StepInStartMethod->m_pszDebugMethodName), pDesc->m_pszDebugClassName, pDesc->m_pszDebugMethodName));
 
         // Assert b/c the Stub-manager should have caught us first.
         // We don't want people relying on TriggerMethodEnter as the real implementation for Traditional Step-in
@@ -7313,6 +7351,7 @@ void DebuggerStepper::TriggerMethodEnter(Thread * thread,
 
     // Place a patch to stop us.
     // Don't bind to a particular AppDomain so that we can do a Cross-Appdomain step.
+    LOG((LF_CORDB, LL_INFO10000, "DS::TME, about to call AddBindAndActivateNativeManagedPatch\n"));
     AddBindAndActivateNativeManagedPatch(pDesc,
                   dji,
                   CodeRegionInfo::GetCodeRegionInfo(dji, pDesc).AddressToOffset(ip),
@@ -7325,6 +7364,7 @@ void DebuggerStepper::TriggerMethodEnter(Thread * thread,
     // Once we resume, we'll go hit that patch since we patched our return address.
     // Furthermore, we know the step will complete with reason = call, so set that now.
     m_reason = STEP_CALL;
+    LOG((LF_CORDB, LL_INFO10000, "DS::TME, end of TriggerMethodEnter\n"));
 }
 
 
@@ -7407,7 +7447,12 @@ bool DebuggerStepper::TriggerSingleStep(Thread *thread, const BYTE *ip)
         ShouldContinueStep( &info, offset))
     {
         if (!TrapStep(&info, m_stepIn))
+        {
+            LOG((LF_CORDB,LL_INFO10000, "DS::TSS: Called TrapStep!\n"));
             TrapStepNext(&info);
+            LOG((LF_CORDB,LL_INFO10000, "DS::TSS: Made it into if(!TrapStep)!\n"));
+        }
+            //TrapStepNext(&info);
 
         EnableUnwind(m_fp);
 

@@ -5148,7 +5148,7 @@ ClrDataAccess::FollowStubStep(
             return E_INVALIDARG;
         }
     }
-
+    //ßLOG((LF_CORDB,LL_INFO10000, "Calling SM::TS in ClrDataAccess::FollowStubStep: %p\n", inAddr));
     if ((!traceDone &&
          !StubManager::TraceStub(inAddr, &trace)) ||
         !StubManager::FollowTrace(&trace))
@@ -5803,7 +5803,7 @@ ClrDataAccess::RawGetMethodName(
             goto NameFromMethodDesc;
         }
     }
-
+    LOG((LF_CORDB, LL_INFO10000, "RawGetMethod name to call StubManager::FindStubManager %p\n", address));
     pStubManager = StubManager::FindStubManager(TO_TADDR(address));
     if (pStubManager != NULL)
     {
