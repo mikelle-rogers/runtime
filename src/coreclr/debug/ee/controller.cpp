@@ -7331,21 +7331,21 @@ void DebuggerStepper::TriggerMethodEnter(Thread * thread,
         // We don't want people relying on TriggerMethodEnter as the real implementation for Traditional Step-in
         // (see above for reasons why). However, using TME will provide a bandage for the final retail product
         // in cases where we are missing a stub-manager.
-        CONSISTENCY_CHECK_MSGF(false, (
-            "\nThe Stubmanagers failed to identify and trace a stub on step-in. The stub-managers for this code-path path need to be fixed.\n"
-            "See http://team/sites/clrdev/Devdocs/StubManagers.rtf for more information on StubManagers.\n"
-            "Stepper this=0x%p, startMethod='%s::%s'\n"
-            "---------------------------------\n"
-            "Stub manager log:\n%s"
-            "\n"
-            "The thread is now in managed method '%s::%s'.\n"
-            "---------------------------------\n",
-            this,
-            ((m_StepInStartMethod == NULL) ? "unknown" : m_StepInStartMethod->m_pszDebugClassName),
-            ((m_StepInStartMethod == NULL) ? "unknown" : m_StepInStartMethod->m_pszDebugMethodName),
-            sLog.GetUTF8(),
-            pDesc->m_pszDebugClassName, pDesc->m_pszDebugMethodName
-            ));
+        // CONSISTENCY_CHECK_MSGF(false, (
+        //     "\nThe Stubmanagers failed to identify and trace a stub on step-in. The stub-managers for this code-path path need to be fixed.\n"
+        //     "See http://team/sites/clrdev/Devdocs/StubManagers.rtf for more information on StubManagers.\n"
+        //     "Stepper this=0x%p, startMethod='%s::%s'\n"
+        //     "---------------------------------\n"
+        //     "Stub manager log:\n%s"
+        //     "\n"
+        //     "The thread is now in managed method '%s::%s'.\n"
+        //     "---------------------------------\n",
+        //     this,
+        //     ((m_StepInStartMethod == NULL) ? "unknown" : m_StepInStartMethod->m_pszDebugClassName),
+        //     ((m_StepInStartMethod == NULL) ? "unknown" : m_StepInStartMethod->m_pszDebugMethodName),
+        //     sLog.GetUTF8(),
+        //     pDesc->m_pszDebugClassName, pDesc->m_pszDebugMethodName
+        //     ));
     }
 #endif
 

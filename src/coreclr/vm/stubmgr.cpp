@@ -1825,7 +1825,7 @@ BOOL ILStubManager::DoTraceStub(PCODE stubStartAddress,
     //LOG((LF_CORDB, LL_EVERYTHING, "ILStubManager::DoTraceStub methodDesc %p\n", *pStubMD));
     if (pStubMD != NULL && pStubMD->AsDynamicMethodDesc()->IsMulticastStub())
     {
-        #if defined(TARGET_ARM64) //&& defined(OSX)
+        #if defined(TARGET_ARM64) && defined(__APPLE__)
         // On ARM64 Mac, we cannot currently put a breakpoint inside of MulticastDebuggerTraceHelper
         LOG((LF_CORDB, LL_INFO10000, "ILStubManager::DoTraceStub got traceDestination %p, from MulticastDebuggerTraceHelper\n", traceDestination));
         return FALSE;
@@ -2147,7 +2147,12 @@ BOOL InteropDispatchStubManager::TraceManager(Thread *thread,
     {
         PCODE target = (PCODE)arg;
         LOG((LF_CORDB, LL_INFO10000, "IDSM::TraceManager: Unmanaged CALLI case 0x%p\n", target));
-        trace->InitForUnmanaged(target);
+        #if defined(TARGET_ARM64) && defined(__APPLE__)
+            // On AMD64 Mac, we cannot currently put a breakpoint inside of GenericPInvokeCalliHelper
+            return FALSE;
+        #else
+            trace->InitForUnmanaged(target);
+        #endif
     }
 #ifdef FEATURE_COMINTEROP
     else
