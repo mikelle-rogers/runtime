@@ -2272,14 +2272,14 @@ BOOL TailCallStubManager::TraceManager(Thread * pThread,
     WRAPPER_NO_CONTRACT;
     TADDR esp = GetSP(pContext);
     TADDR ebp = GetFP(pContext);
-    // #if defined(TARGET_ARM64) && defined(__APPLE__)
-    //     // On ARM64 Mac, we cannot put a breakpoint inside of JIT_TailCallLeave
-    //     if (GetIP(pContext) == GetEEFuncEntryPoint(JIT_TailCallLeave))
-    //     {
-    //         LOG((LF_CORDB, LL_INFO1000, "TailCallStubManager::TraceManager skipping on M1\n"));
-    //         return FALSE;
-    //     }
-    // #endif
+    #if defined(TARGET_ARM64) && defined(__APPLE__)
+        // On ARM64 Mac, we cannot put a breakpoint inside of JIT_TailCallLeave
+        if (GetIP(pContext) == GetEEFuncEntryPoint(JIT_TailCallLeave))
+        {
+            LOG((LF_CORDB, LL_INFO1000, "TailCallStubManager::TraceManager skipping on M1\n"));
+            return FALSE;
+        }
+    #endif
     // Check if we are stopped at the beginning of JIT_TailCall().
     if (GetIP(pContext) == GetEEFuncEntryPoint(JIT_TailCall))
     {
