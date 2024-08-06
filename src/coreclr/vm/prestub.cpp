@@ -2600,6 +2600,7 @@ static PCODE PreStubWorker_Preemptive(
         HardwareExceptionHolder;
 
         // Give debugger opportunity to stop here
+        LOG((LF_CORDB, LL_INFO1000, "PreStubWorker_Preemptive\n"));
         ThePreStubPatch();
     }
 
@@ -2705,6 +2706,7 @@ extern "C" PCODE STDCALL PreStubWorker(TransitionBlock* pTransitionBlock, Method
             HardwareExceptionHolder;
 
             // Give debugger opportunity to stop here
+            LOG((LF_CORDB, LL_INFO1000, "PreStubWorker\n"));
             ThePreStubPatch();
         }
 

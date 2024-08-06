@@ -13676,6 +13676,7 @@ BOOL LoadDynamicInfoEntry(Module *currentModule,
                     break;
 
                 case READYTORUN_HELPER_DelayLoad_MethodCall:
+                    LOG((LF_CORDB, LL_EVERYTHING, "In case READYTORUN_HELPER_DelayLoad_MethodCall\n"));
                     result = (size_t)GetEEFuncEntryPoint(DelayLoad_MethodCall);
                     break;
 
