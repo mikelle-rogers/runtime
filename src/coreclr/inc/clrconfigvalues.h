@@ -168,6 +168,7 @@ RETAIL_CONFIG_DWORD_INFO(EXTERNAL_EnableDiagnostics, W("EnableDiagnostics"), 1, 
 RETAIL_CONFIG_DWORD_INFO(EXTERNAL_EnableDiagnostics_IPC, W("EnableDiagnostics_IPC"), 1, "Allows the diagnostic IPC service ports to be disabled")
 RETAIL_CONFIG_DWORD_INFO(EXTERNAL_EnableDiagnostics_Debugger, W("EnableDiagnostics_Debugger"), 1, "Allows the debugger to be disabled")
 RETAIL_CONFIG_DWORD_INFO(EXTERNAL_EnableDiagnostics_Profiler, W("EnableDiagnostics_Profiler"), 1, "Allows the profiler to be disabled")
+RETAIL_CONFIG_DWORD_INFO(EXTERNAL_MacOSStepInStubFallThrough, W("MacOSStepInStubFallThrough"), 1, "On macOS step-in, prevents the debugger setting breakpoints in stubs in the text section of libcoreclr")
 
 CONFIG_DWORD_INFO(INTERNAL_D__FCE, W("D::FCE"), 0, "Allows an assert when crawling the managed stack for an exception handler")
 CONFIG_DWORD_INFO(INTERNAL_DbgBreakIfLocksUnavailable, W("DbgBreakIfLocksUnavailable"), 0, "Allows an assert when the debugger can't take a lock ")

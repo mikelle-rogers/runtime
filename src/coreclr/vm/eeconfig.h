@@ -101,6 +101,10 @@ public:
     bool          ReadyToRun(void) const { LIMITED_METHOD_CONTRACT;  return fReadyToRun; }
 #endif
 
+#if defined(FEATURE_MACOS_STEPIN_STUB_FALLTHROUGH)
+    bool          MacosStepInStubFallthrough(void) const { LIMITED_METHOD_CONTRACT;  return fMacosStepInStubFallthrough; }
+#endif
+
 #if defined(FEATURE_ON_STACK_REPLACEMENT)
     // OSR Config
     DWORD         OSR_CounterBump() const { LIMITED_METHOD_CONTRACT; return dwOSR_CounterBump; }
@@ -626,6 +630,10 @@ private: //----------------------------------------------------------------
 
 #if defined(FEATURE_READYTORUN)
     bool fReadyToRun;
+#endif
+
+#if defined(FEATURE_MACOS_STEPIN_STUB_FALLTHROUGH)
+    bool fMacOSStepInStubFallThrough;
 #endif
 
 #if defined(FEATURE_ON_STACK_REPLACEMENT)

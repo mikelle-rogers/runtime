@@ -473,7 +473,9 @@ HRESULT EEConfig::sync()
 #ifdef FEATURE_DOUBLE_ALIGNMENT_HINT
     DoubleArrayToLargeObjectHeapThreshold = CLRConfig::GetConfigValue(CLRConfig::UNSUPPORTED_DoubleArrayToLargeObjectHeap, DoubleArrayToLargeObjectHeapThreshold);
 #endif
-
+#if defined(FEATURE_MACOS_STEPIN_STUB_FALLTHROUGH)
+    fMacOSStepInStubFallThrough = CLRConfig::GetConfigValue(CLRConfig::EXTERNAL_MacOSStepInStubFallThrough);
+#endif
 #ifdef _DEBUG
     IfFailRet (CLRConfig::GetConfigValue(CLRConfig::INTERNAL_BreakOnClassLoad, (LPWSTR*) &pszBreakOnClassLoad));
     pszBreakOnClassLoad = NarrowWideChar((LPWSTR)pszBreakOnClassLoad);
