@@ -1234,17 +1234,20 @@ bool DebuggerController::BindPatch(DebuggerControllerPatch *patch,
     //
     // Translate patch to address, if it hasn't been already.
     //
-
+    LOG((LF_CORDB,LL_INFO10000, "DC::BP: First Patch address is %p\n",patch->address));
     if (patch->address != NULL)
     {
+        LOG((LF_CORDB,LL_INFO10000, "DC::BP: Patch address was not null, returning true.\n"));
         return true;
     }
 
     if (startAddr == NULL)
     {
+        LOG((LF_CORDB,LL_INFO10000, "DC::BP: startaddr was null.\n"));
         if (patch->HasDJI() && patch->GetDJI()->m_jitComplete)
         {
             startAddr = (CORDB_ADDRESS_TYPE *) CORDB_ADDRESS_TO_PTR(patch->GetDJI()->m_addrOfCode);
+            LOG((LF_CORDB,LL_INFO10000, "DC::BP: startAddr address is %p\n",startAddr));
             _ASSERTE(startAddr != NULL);
         }
         //We should never be calling this function with both a NULL startAddr and a DJI that doesn't have code.
@@ -1252,10 +1255,10 @@ bool DebuggerController::BindPatch(DebuggerControllerPatch *patch,
     }
 
     _ASSERTE(!g_pEEInterface->IsStub((const BYTE *)startAddr));
-
+    
     // If we've jitted, map to a native offset.
     DebuggerJitInfo *info = g_pDebugger->GetJitInfo(pMD, (const BYTE *)startAddr);
-
+    LOG((LF_CORDB,LL_INFO10000, "DC::BP: startAddr is not a Stub %p\n",startAddr));
 #ifdef LOGGING
     if (info == NULL)
     {
@@ -1828,6 +1831,7 @@ BOOL DebuggerController::AddBindAndActivateILReplicaPatch(DebuggerControllerPatc
 
     if (primary->offsetIsIL == 0)
     {
+        LOG((LF_CORDB, LL_INFO1000, "Going to call AddBindAndActivatePatchForMethodDesc inside ABAAILRP\n"));
         // Zero is the only native offset that we allow to bind across different jitted
         // code bodies.
         _ASSERTE(primary->offset == 0);
@@ -1864,7 +1868,7 @@ BOOL DebuggerController::AddBindAndActivateILReplicaPatch(DebuggerControllerPatc
             }
 
             result = TRUE;
-
+            LOG((LF_CORDB, LL_INFO1000, "Going to call AddBindAndActivatePatchForMethodDesc inside ABAAILRP 2\n"));
             INDEBUG(BOOL fOk = )
                 AddBindAndActivatePatchForMethodDesc(pMD, dji,
                     offsetNative, PATCH_KIND_IL_REPLICA,
@@ -2031,6 +2035,7 @@ BOOL DebuggerController::AddBindAndActivateNativeManagedPatch(MethodDesc * fd,
     // For non-dynamic methods, we always expect to have a DJI, but just in case, we don't want the assert to AV.
     _ASSERTE((dji == NULL) || (fd == dji->m_nativeCodeVersion.GetMethodDesc()));
     _ASSERTE(g_patches != NULL);
+    LOG((LF_CORDB, LL_INFO1000, "Going to call AddBindAndActivatePatchForMethodDesc inside ABAANMP\n"));
     return DebuggerController::AddBindAndActivatePatchForMethodDesc(fd, dji, offsetNative, PATCH_KIND_NATIVE_MANAGED, fp, pAppDomain);
 }
 
@@ -2074,6 +2079,7 @@ BOOL DebuggerController::AddBindAndActivatePatchForMethodDesc(MethodDesc *fd,
 
     if (DebuggerController::BindPatch(patch, fd, NULL))
     {
+        LOG((LF_CORDB, LL_INFO1000, "Going to call ActivatePatch inside ABAAPFMD means BindPatch returned true and ABAAPFMD will return true\n"));
         DebuggerController::ActivatePatch(patch);
         ok = TRUE;
     }
@@ -4996,11 +5002,20 @@ bool DebuggerStepper::ShouldContinueStep( ControllerStackInfo *info,
         if ( interestingMappings )
         {
             if ( interestingMappings & m_rgfMappingStop )
+            {
+                LOG((LF_CORDB,LL_INFO10000,"DeSt::ShContSt: returning false in if statement\n"));
                 return false;
+            }
+                //return false;
             else
+            {
+                LOG((LF_CORDB,LL_INFO10000,"DeSt::ShContSt: returning true in else statement\n"));
                 return true;
+            }
+                //return true;
         }
     }
+    LOG((LF_CORDB,LL_INFO10000,"DeSt::ShContSt: returning false\n"));
     return false;
 }
 
@@ -5859,6 +5874,7 @@ bool DebuggerStepper::TrapStep(ControllerStackInfo *info, bool in)
                     // In this case, we want to step into the funclet even if the step operation is a step-over.
                     if (in || fCallingIntoFunclet)
                     {
+                        LOG((LF_CORDB,LL_INFO10000,"DS::TS We called this TSIH.\n"));
                         if (TrapStepInHelper(info, walker.GetNextIP(), walker.GetSkipIP(), fCallingIntoFunclet, fIsJump))
                         {
                             return true;
@@ -5937,6 +5953,7 @@ bool DebuggerStepper::TrapStep(ControllerStackInfo *info, bool in)
         if (!IsInRange(offset, range, rangeCount)
             && !ShouldContinueStep( info, offset ))
         {
+            LOG((LF_CORDB, LL_INFO1000, "Going to call AddBindAndActivateNativeManagedPatch inside TrapStep\n"));
             AddBindAndActivateNativeManagedPatch(info->m_activeFrame.md,
                      ji,
                      offset,
@@ -5956,6 +5973,7 @@ bool DebuggerStepper::TrapStep(ControllerStackInfo *info, bool in)
             // we'll single step rather than TrapStepOut. If we see a return in the
             // code stream, then we'll set a breakpoint there, so that we can
             // examine the return address, and decide whether to SS or TSO then
+            LOG((LF_CORDB, LL_INFO1000, "Going to call AddBindAndActivateNativeManagedPatch inside WALK_RETURN\n"));
             AddBindAndActivateNativeManagedPatch(info->m_activeFrame.md,
                      ji,
                      offset,
@@ -5974,6 +5992,7 @@ bool DebuggerStepper::TrapStep(ControllerStackInfo *info, bool in)
                 LOG((LF_CORDB, LL_INFO10000, "DS::TS: WALK_CALL IsAddrWithinFrame, Adding Patch.\n"));
 
                 // How else to detect this?
+                LOG((LF_CORDB, LL_INFO1000, "Going to call AddBindAndActivateNativeManagedPatch inside WALK_CALL\n"));
                 AddBindAndActivateNativeManagedPatch(info->m_activeFrame.md,
                          ji,
                          CodeRegionInfo::GetCodeRegionInfo(ji, info->m_activeFrame.md).AddressToOffset(walker.GetNextIP()),
@@ -5986,6 +6005,7 @@ bool DebuggerStepper::TrapStep(ControllerStackInfo *info, bool in)
             {
                 if (!in)
                 {
+                    LOG((LF_CORDB, LL_INFO1000, "Going to call AddBindAndActivateNativeManagedPatch inside WALK_CALL2\n"));
                     AddBindAndActivateNativeManagedPatch(info->m_activeFrame.md,
                                                          ji,
                                                          offset,
@@ -6019,6 +6039,7 @@ bool DebuggerStepper::TrapStep(ControllerStackInfo *info, bool in)
 
                 if (TrapStepInHelper(info, walker.GetNextIP(), walker.GetSkipIP(), fCallingIntoFunclet, false))
                 {
+                    LOG((LF_CORDB,LL_INFO10000,"DS::TS The second one is where we called.\n"));
                     return true;
                 }
 
@@ -6046,6 +6067,7 @@ bool DebuggerStepper::TrapStep(ControllerStackInfo *info, bool in)
         default:
             if (walker.GetNextIP() == NULL)
             {
+                LOG((LF_CORDB, LL_INFO1000, "Going to call AddBindAndActivateNativeManagedPatch inside default\n"));
                 AddBindAndActivateNativeManagedPatch(info->m_activeFrame.md,
                     ji,
                     offset,

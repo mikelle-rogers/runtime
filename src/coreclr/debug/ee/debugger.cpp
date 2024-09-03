@@ -2713,6 +2713,7 @@ DebuggerJitInfo *Debugger::GetJitInfoWorker(MethodDesc *fd, const BYTE *pbAddr, 
     if (dmi == NULL)
     {
         // If we can't create the DMI, we won't be able to create the DJI.
+        LOG((LF_CORDB,LL_INFO10000, "D::GJIW returning NULL.\n"));
         return NULL;
     }
 
@@ -2724,6 +2725,7 @@ DebuggerJitInfo *Debugger::GetJitInfoWorker(MethodDesc *fd, const BYTE *pbAddr, 
     else
     {
         PCODE startAddr = g_pEEInterface->GetNativeCodeStartAddress((PCODE)pbAddr);
+        LOG((LF_CORDB,LL_INFO10000, "DC::GJIW In the method.\n"));
         if (startAddr == (PCODE)NULL)
         {
             LOG((LF_CORDB,LL_INFO1000,"D::GJIW: Couldn't find a DJI by address 0x%p, "
