@@ -2613,7 +2613,14 @@ public:
     bool ThisIsHelperThread(void);
 
     HRESULT ReDaclEvents(PSECURITY_DESCRIPTOR securityDescriptor);
-
+    #ifndef DACCESS_COMPILE
+    BOOL Debugger::MulticastTraceNextStep(BYTE* pbDel, INT32 count);
+    #endif
+    // BOOL DebuggerAddBindAndActivateNativeManagedPatch(MethodDesc * fd,
+    //                                                     DebuggerJitInfo *dji,
+    //                                                     SIZE_T offsetNative,
+    //                                                     FramePointer fp,
+    //                                                     AppDomain *pAppDomain);
 #ifdef DACCESS_COMPILE
     virtual void EnumMemoryRegions(CLRDataEnumMemoryFlags flags);
     virtual void EnumMemoryRegionsIfFuncEvalFrame(CLRDataEnumMemoryFlags flags, Frame * pFrame);
@@ -2886,6 +2893,7 @@ public:
     void MarkDebuggerUnattachedInternal();
 
     HANDLE                GetAttachEvent()          { return  GetLazyData()->m_exAttachEvent; }
+
 
 private:
 #ifndef DACCESS_COMPILE

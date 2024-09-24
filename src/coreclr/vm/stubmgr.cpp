@@ -591,7 +591,7 @@ BOOL StubManager::FollowTrace(TraceDestination *trace)
     STATIC_CONTRACT_NOTHROW;
     STATIC_CONTRACT_GC_NOTRIGGER;
     STATIC_CONTRACT_FORBID_FAULT;
-
+    LOG((LF_CORDB, LL_INFO1000, "StubManager::FollowTrace.\n"));
     while (trace->GetTraceType() == TRACE_STUB)
     {
         LOG((LF_CORDB, LL_INFO10000,
@@ -1161,6 +1161,7 @@ BOOL StubLinkStubManager::TraceDelegateObject(BYTE* pbDel, TraceDestination *tra
 
     if (pbDelInvocationList == NULL)
     {
+        LOG((LF_CORDB,LL_INFO10000, "SLSM::TDO: invocationlist is null\n"));
         // A null invocationList can be one of the following:
         //  - Instance closed, Instance open non-virt, Instance open virtual, Static closed, Static opened, Unmanaged FtnPtr
         //  - Instance open virtual is complex and we need to figure out what to do (TODO).
@@ -1170,6 +1171,7 @@ BOOL StubLinkStubManager::TraceDelegateObject(BYTE* pbDel, TraceDestination *tra
         ppbDest = (BYTE **)(pbDel + DelegateObject::GetOffsetOfMethodPtrAux());
         if (*ppbDest == NULL)
         {
+            LOG((LF_CORDB,LL_INFO10000, "SLSM::TDO: MethodPtrAux (*ppDest) is null\n"));
             ppbDest = (BYTE **)(pbDel + DelegateObject::GetOffsetOfMethodPtr());
 
             if (*ppbDest == NULL)
@@ -1196,6 +1198,7 @@ BOOL StubLinkStubManager::TraceDelegateObject(BYTE* pbDel, TraceDestination *tra
     BYTE *pbCount = *(BYTE **)(pbDel + DelegateObject::GetOffsetOfInvocationCount());
     if (pbCount == NULL)
     {
+        LOG((LF_CORDB,LL_INFO10000, "SLSM::TDO: ppbDest: pbCount GOOIC is null\n"));
         // it's a static closed, the target lives in _methodAuxPtr
         ppbDest = (BYTE **)(pbDel + DelegateObject::GetOffsetOfMethodPtrAux());
 
@@ -1218,6 +1221,7 @@ BOOL StubLinkStubManager::TraceDelegateObject(BYTE* pbDel, TraceDestination *tra
     MethodTable *pType = *(MethodTable**)pbDelInvocationList;
     if (pType->IsDelegate())
     {
+        LOG((LF_CORDB, LL_INFO1000, "SLSM::TraceDelegateObject: This is a secure delegate.\n"));
         // this is a secure delegate. The target is hidden inside this field, so recurse.
         return TraceDelegateObject(pbDelInvocationList, trace);
     }
@@ -1226,7 +1230,9 @@ BOOL StubLinkStubManager::TraceDelegateObject(BYTE* pbDel, TraceDestination *tra
     // In order to go to the correct spot, we have just have to fish out
     // slot 0 of the invocation list, and figure out where that's going to,
     // then put a breakpoint there.
+    LOG((LF_CORDB, LL_INFO1000, "SLSM::TraceDelegateObject: going for the first invoke of multi case.\n"));
     pbDel = *(BYTE**)(((ArrayBase *)pbDelInvocationList)->GetDataPtr());
+    LOG((LF_CORDB,LL_INFO1000, "SLSM::TDO: pbDel: %p *ppbDest:%p\n", pbDel));
     return TraceDelegateObject(pbDel, trace);
 }
 
@@ -1716,6 +1722,7 @@ BOOL ILStubManager::DoTraceStub(PCODE stubStartAddress,
         LOG((LF_CORDB, LL_INFO10000, "ILSM::DoTraceStub: skipping on arm64-macOS\n"));
         return FALSE;
 #else
+        LOG((LF_CORDB, LL_INFO10000, "ILSM::DoTraceStub: calling\n"));
         traceDestination = GetEEFuncEntryPoint(StubHelpers::MulticastDebuggerTraceHelper);
 #endif //defined(TARGET_ARM64) && defined(__APPLE__)
     }
@@ -1776,8 +1783,10 @@ BOOL ILStubManager::TraceManager(Thread *thread,
 
     if (stubIP == GetEEFuncEntryPoint(StubHelpers::MulticastDebuggerTraceHelper))
     {
+        LOG((LF_CORDB, LL_INFO1000, "ILSM::TraceManager: About to get the information for where the return address needs to be which is where the breakpoint will be set.\n"));
         stubIP = (PCODE)*pRetAddr;
         *pRetAddr = (BYTE*)StubManagerHelpers::GetRetAddrFromMulticastILStubFrame(pContext);
+        LOG((LF_CORDB, LL_INFO1000, "RetAddr: %p\n", (void*)*(uintptr_t*)pRetAddr));
     }
 
     DynamicMethodDesc *pStubMD = Entry2MethodDesc(stubIP, NULL)->AsDynamicMethodDesc();
@@ -1803,6 +1812,7 @@ BOOL ILStubManager::TraceManager(Thread *thread,
         else
         {
             // We're going to execute stub delegateCount next, so go and grab it.
+            LOG((LF_CORDB, LL_INFO1000, "ILSM::TraceManager: Count the number of delegates.\n"));
             BYTE *pbDelInvocationList = *(BYTE **)((BYTE*)pThis + DelegateObject::GetOffsetOfInvocationList());
 
             BYTE* pbDel = *(BYTE**)( ((ArrayBase *)pbDelInvocationList)->GetDataPtr() +

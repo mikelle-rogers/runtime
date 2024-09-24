@@ -26,6 +26,7 @@
 #include "../../vm/dwreport.h"
 #include "../../vm/eepolicy.h"
 #include "../../vm/excep.h"
+#include "../../vm/stubhelpers.h"
 #if defined(FEATURE_DBGIPC_TRANSPORT_VM)
 #include "dbgtransportsession.h"
 #endif // FEATURE_DBGIPC_TRANSPORT_VM
@@ -16788,5 +16789,13 @@ BOOL Debugger::IsOutOfProcessSetContextEnabled()
 #endif // OUT_OF_PROCESS_SETTHREADCONTEXT
 #endif // DACCESS_COMPILE
 
+#ifndef DACCESS_COMPILE
+BOOL Debugger::MulticastTraceNextStep(BYTE* pbDel, INT32 count)
+{
+    //DebuggerStepper::TriggerMulticastDelegate(BYTE* pbDel)
+    DebuggerController::DispatchMulticastDelegate(pbDel, count);
+    return TRUE;
+}
+#endif //DACCESS_COMPILE
 #endif //DEBUGGING_SUPPORTED
 
