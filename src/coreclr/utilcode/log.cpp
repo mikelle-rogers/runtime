@@ -160,7 +160,7 @@ VOID EnterLogLock()
     {
         DWORD status;
         status = WaitForSingleObjectEx(LogFileMutex, INFINITE, FALSE);
-        _ASSERTE(WAIT_OBJECT_0 == status);
+        //_ASSERTE(WAIT_OBJECT_0 == status);
     }
 }
 

@@ -20,6 +20,7 @@
 
 #include "../../vm/methoditer.h"
 #include "../../vm/tailcallhelp.h"
+#include "../../vm/stubhelpers.h"
 
 const char *GetTType( TraceType tt);
 
@@ -498,6 +499,7 @@ DebuggerControllerPatch *DebuggerPatchTable::AddPatchForMethodDef(DebuggerContro
 #endif // !FEATURE_EMULATE_SINGLESTEP
 
     //initialize the patch data structure.
+    LOG((LF_CORDB, LL_INFO10000, "DPT::APFMD InitializePRD patch data structure\n"));
     InitializePRD(&(patch->opcode));
     patch->controller = controller;
     patch->key.module = module;
@@ -943,7 +945,8 @@ DebuggerController::DebuggerController(Thread * pThread, AppDomain * pAppDomain)
     m_unwindFP(LEAF_MOST_FRAME),
     m_eventQueuedCount(0),
     m_deleted(false),
-    m_fEnableMethodEnter(false)
+    m_fEnableMethodEnter(false),
+    m_multicastDelegateHelper(false)
 {
     CONTRACTL
     {
@@ -1133,6 +1136,8 @@ void DebuggerController::DisableAll()
             DisableTraceCall();
         if (m_fEnableMethodEnter)
             DisableMethodEnter();
+        if (m_multicastDelegateHelper)
+            DisableMultiCastDelegate();
     }
 }
 
@@ -2004,6 +2009,7 @@ void DebuggerController::AddPatchToStartOfLatestMethod(MethodDesc * fd)
     Module* pModule = fd->GetModule();
     mdToken defToken = fd->GetMemberDef();
     DebuggerMethodInfo* pDMI = g_pDebugger->GetOrCreateMethodInfo(pModule, defToken);
+    LOG((LF_CORDB, LL_INFO10000,"AddILPatch...\n"));
     DebuggerController::AddILPatch(GetAppDomain(), pModule, defToken, fd, pDMI->GetCurrentEnCVersion(), 0, FALSE);
     return;
 }
@@ -2031,6 +2037,7 @@ BOOL DebuggerController::AddBindAndActivateNativeManagedPatch(MethodDesc * fd,
     // For non-dynamic methods, we always expect to have a DJI, but just in case, we don't want the assert to AV.
     _ASSERTE((dji == NULL) || (fd == dji->m_nativeCodeVersion.GetMethodDesc()));
     _ASSERTE(g_patches != NULL);
+    LOG((LF_CORDB, LL_INFO10000, "DC::ABAANMP returning ABAAPFMD method desc\n"));
     return DebuggerController::AddBindAndActivatePatchForMethodDesc(fd, dji, offsetNative, PATCH_KIND_NATIVE_MANAGED, fp, pAppDomain);
 }
 
@@ -2071,9 +2078,10 @@ BOOL DebuggerController::AddBindAndActivatePatchForMethodDesc(MethodDesc *fd,
                             pAppDomain,
                             0,
                             dji);
-
+    LOG((LF_CORDB, LL_INFO10000, "DC::ABAAPFMD calling DC::BindPatch\n"));
     if (DebuggerController::BindPatch(patch, fd, NULL))
     {
+        LOG((LF_CORDB, LL_INFO10000, "DC::ABAAPFMD Calling ActivatePatch, will return true.\n"));
         DebuggerController::ActivatePatch(patch);
         ok = TRUE;
     }
@@ -2279,6 +2287,7 @@ static bool _AddrIsJITHelper(PCODE addr)
 // method & return true.
 //
 // Return true if we set a patch, else false
+#ifndef DACCESS_COMPILE
 bool DebuggerController::PatchTrace(TraceDestination *trace,
                                     FramePointer fp,
                                     bool fStopInUnmanaged)
@@ -2292,6 +2301,7 @@ bool DebuggerController::PatchTrace(TraceDestination *trace,
         PRECONDITION(ThisMaybeHelperThread());
     }
     CONTRACTL_END;
+    LOG((LF_CORDB, LL_INFO1000, "DC::PT: at the beginning with trace type: %d.\n", trace->GetTraceType()));
     DebuggerControllerPatch *dcp = NULL;
     SIZE_T nativeOffset = 0;
 
@@ -2320,7 +2330,7 @@ bool DebuggerController::PatchTrace(TraceDestination *trace,
 
     case TRACE_MANAGED:
         LOG((LF_CORDB, LL_INFO10000,
-             "Setting managed trace patch at 0x%p(%p)\n", trace->GetAddress(), fp.GetSPValue()));
+             "DC::PT Setting managed trace patch at 0x%p(%p)\n", trace->GetAddress(), fp.GetSPValue()));
 
         MethodDesc *fd;
         fd = g_pEEInterface->GetNativeCodeMethodDesc(trace->GetAddress());
@@ -2341,10 +2351,14 @@ bool DebuggerController::PatchTrace(TraceDestination *trace,
         // out of that jitted code.
         if (nativeOffset == 0)
         {
+            LOG((LF_CORDB, LL_INFO10000,
+             "DC::PT nativeOffset equaled zero, adding patch to start of latest method, fd:%p, %s::%s.\n", fd, fd->m_pszDebugClassName, fd->m_pszDebugMethodName));
             AddPatchToStartOfLatestMethod(fd);
         }
         else
         {
+            LOG((LF_CORDB, LL_INFO10000,
+             "DC::PT else ABAANMP inside of patchtrace, fd:%p, %s::%s.\n", fd, fd->m_pszDebugClassName, fd->m_pszDebugMethodName));
             AddBindAndActivateNativeManagedPatch(fd, dji, nativeOffset, fp, NULL);
         }
 
@@ -2355,7 +2369,7 @@ bool DebuggerController::PatchTrace(TraceDestination *trace,
         // trace->address is actually a MethodDesc* of the method that we'll
         // soon JIT, so put a relative bp at offset zero in.
         LOG((LF_CORDB, LL_INFO10000,
-            "Setting unjitted method patch in MethodDesc %p %s\n", trace->GetMethodDesc(), trace->GetMethodDesc() ? trace->GetMethodDesc()->m_pszDebugMethodName : ""));
+            "DC::PT Setting unjitted method patch in MethodDesc %p %s\n", trace->GetMethodDesc(), trace->GetMethodDesc() ? trace->GetMethodDesc()->m_pszDebugMethodName : ""));
 
         // Note: we have to make sure to bind here. If this function is prejitted, this may be our only chance to get a
         // DebuggerJITInfo and thereby cause a JITComplete callback.
@@ -2364,7 +2378,7 @@ bool DebuggerController::PatchTrace(TraceDestination *trace,
 
     case TRACE_FRAME_PUSH:
         LOG((LF_CORDB, LL_INFO10000,
-             "Setting frame patch at 0x%p(%p)\n", trace->GetAddress(), fp.GetSPValue()));
+             "DC::PT Setting frame patch at 0x%p(%p)\n", trace->GetAddress(), fp.GetSPValue()));
 
         AddAndActivateNativePatchForAddress((CORDB_ADDRESS_TYPE *)trace->GetAddress(),
                  fp,
@@ -2373,14 +2387,23 @@ bool DebuggerController::PatchTrace(TraceDestination *trace,
         return true;
 
     case TRACE_MGR_PUSH:
-        LOG((LF_CORDB, LL_INFO10000,
+        LOG((LF_CORDB, LL_INFO1000, "DC::PT, with case = TRACE_MGR_PUSH.\n"));
+        if (trace->GetAddress() == GetEEFuncEntryPoint(StubHelpers::MulticastDebuggerTraceHelper))
+        {
+            LOG((LF_CORDB, LL_INFO1000, "Enabling MulticastDelegate\n"));
+            EnableMultiCastDelegate();
+        }
+        else
+        {
+            LOG((LF_CORDB, LL_INFO10000,
              "Setting frame patch (TRACE_MGR_PUSH) at 0x%p(%p)\n",
              trace->GetAddress(), fp.GetSPValue()));
 
-        dcp = AddAndActivateNativePatchForAddress((CORDB_ADDRESS_TYPE *)trace->GetAddress(),
-                       LEAF_MOST_FRAME, // But Mgr_push can't have fp affinity!
-                       TRUE,
-                       DPT_DEFAULT_TRACE_TYPE); // TRACE_OTHER
+            dcp = AddAndActivateNativePatchForAddress((CORDB_ADDRESS_TYPE *)trace->GetAddress(),
+                        LEAF_MOST_FRAME, // But Mgr_push can't have fp affinity!
+                        TRUE,
+                        DPT_DEFAULT_TRACE_TYPE); // TRACE_OTHER
+        }
         // Now copy over the trace field since TriggerPatch will expect this
         // to be set for this case.
         if (dcp != NULL)
@@ -2396,10 +2419,13 @@ bool DebuggerController::PatchTrace(TraceDestination *trace,
         return false;
 
     default:
+        LOG((LF_CORDB, LL_INFO10000,
+             "DC::PT In the default...\n"));
         _ASSERTE(0);
         return false;
     }
 }
+#endif
 
 //-----------------------------------------------------------------------------
 // Checks if the patch matches the context + thread.
@@ -3879,6 +3905,80 @@ void DebuggerController::DispatchMethodEnter(void * pIP, FramePointer fp)
 
 }
 
+void DebuggerController::EnableMultiCastDelegate()
+{
+    CONTRACTL
+    {
+        NOTHROW;
+        GC_NOTRIGGER;
+    }
+    CONTRACTL_END;
+
+    ControllerLockHolder chController;
+    Debugger::DebuggerDataLockHolder chInfo(g_pDebugger);
+    if (!m_multicastDelegateHelper)
+    {
+        LOG((LF_CORDB, LL_INFO1000000, "DC::EnableMultiCastDel, this=%p, previously disabled\n", this));
+        m_multicastDelegateHelper = true;
+    }
+    else
+    {
+        LOG((LF_CORDB, LL_INFO1000000, "DC::EnableMultiCastDel, this=%p, already set\n", this));
+    }
+}
+
+void DebuggerController::DisableMultiCastDelegate()
+{
+    CONTRACTL
+    {
+        NOTHROW;
+        GC_NOTRIGGER;
+    }
+    CONTRACTL_END;
+
+    ControllerLockHolder chController;
+    Debugger::DebuggerDataLockHolder chInfo(g_pDebugger);
+
+    if (m_multicastDelegateHelper)
+    {
+        LOG((LF_CORDB, LL_INFO10000, "DC::DisableMultiCastDel, this=%p, previously set\n", this));
+        m_multicastDelegateHelper = false;
+    }
+    else
+    {
+        LOG((LF_CORDB, LL_INFO10000, "DC::DisableMultiCastDel, this=%p, already disabled\n", this));
+    }
+}
+
+// Loop through controllers and dispatch TriggerMulticastDelegate
+void DebuggerController::DispatchMulticastDelegate(BYTE* pbDel, INT32 countDel)
+{
+    LOG((LF_CORDB, LL_INFO10000, "DC::DispatchMulticastDelegate\n"));
+    //_ASSERTE(pIP != NULL);
+
+    Thread * pThread = g_pEEInterface->GetThread();
+    _ASSERTE(pThread  != NULL);
+
+    ControllerLockHolder lockController;
+
+    DebuggerController *p = g_controllers;
+    LOG((LF_CORDB, LL_INFO10000, "DC::DMCD starting the loop.\n"));
+    while (p != NULL)
+    {
+        LOG((LF_CORDB, LL_INFO10000, "DC::DMCD Iterating through.\n"));
+        if (p->m_multicastDelegateHelper)
+        {
+            LOG((LF_CORDB, LL_INFO10000, "DC::DMCD passed the first test\n"));
+            if ((p->GetThread() == NULL) || (p->GetThread() == pThread))
+            {
+                LOG((LF_CORDB, LL_INFO10000, "DC::DMCD about to Trigger.\n"));
+                p->TriggerMulticastDelegate(pbDel, countDel);
+            }
+        }
+        p = p->m_next;
+    }
+}
+
 //
 // AddProtection adds page protection to (at least) the given range of
 // addresses
@@ -3964,6 +4064,11 @@ void DebuggerController::TriggerMethodEnter(Thread * thread,
 {
     LOG((LF_CORDB, LL_INFO10000, "DC::TME in default impl. dji=%p, addr=%p, fp=%p\n",
         dji, ip, fp.GetSPValue()));
+}
+
+void DebuggerController::TriggerMulticastDelegate(BYTE* pDel, INT32 delegateCount)
+{
+    LOG((LF_CORDB, LL_INFO10000, "DC::TMD: in default TriggerMulticastDelegate\n"));
 }
 
 bool DebuggerController::SendEvent(Thread *thread, bool fIpChanged)
@@ -6277,13 +6382,13 @@ void DebuggerStepper::TrapStepOut(ControllerStackInfo *info, bool fForceTraditio
             TraceDestination trace;
 
             EnableTraceCall(info->m_activeFrame.fp);
-
+            LOG((LF_CORDB, LL_INFO10000, "Ds::TSO Is it this one?\n"));
             PCODE ip = GetControlPC(&(info->m_activeFrame.registers));
             if (g_pEEInterface->TraceStub((BYTE*)ip, &trace)
                 && g_pEEInterface->FollowTrace(&trace)
                 && PatchTrace(&trace, info->m_activeFrame.fp,
                               true))
-                break;
+                continue; //maybe change this to continue?
         }
         else if (info->m_activeFrame.md != nullptr && info->m_activeFrame.md->IsILStub() &&
                  info->m_activeFrame.md->AsDynamicMethodDesc()->GetILStubType() == DynamicMethodDesc::StubTailCallCallTarget)
@@ -6492,7 +6597,7 @@ void DebuggerStepper::TrapStepOut(ControllerStackInfo *info, bool fForceTraditio
 
     // <REVISIT_TODO>If we get here, we may be stepping out of the last frame.  Our thread
     // exit logic should catch this case. (@todo)</REVISIT_TODO>
-    LOG((LF_CORDB, LL_INFO10000,"DS::TSO: done\n"));
+    LOG((LF_CORDB, LL_INFO10000,"DS::TSO: done.\n"));
 }
 
 
@@ -7016,6 +7121,7 @@ TP_RESULT DebuggerStepper::TriggerPatch(DebuggerControllerPatch *patch,
 
             if (patch->trace.GetTraceType() == TRACE_MGR_PUSH)
             {
+                LOG((LF_CORDB, LL_INFO10000, "Trace type is TRACE_MGR_PUSH\n"));
                 _ASSERTE(context != NULL);
                 CONTRACT_VIOLATION(GCViolation);
                 traceOk = g_pEEInterface->TraceManager(
@@ -7080,6 +7186,7 @@ TP_RESULT DebuggerStepper::TriggerPatch(DebuggerControllerPatch *patch,
 
                     if (g_pEEInterface->IsManagedNativeCode(traceManagerRetAddr))
                     {
+                        LOG((LF_CORDB, LL_INFO10000, "DS::TP IsManagedNativeCode\n"));
                         // Grab the jit info for the method.
                         DebuggerJitInfo *dji;
                         dji = g_pDebugger->GetJitInfoFromAddr((TADDR) traceManagerRetAddr);
@@ -7088,11 +7195,13 @@ TP_RESULT DebuggerStepper::TriggerPatch(DebuggerControllerPatch *patch,
                         PCODE pcodeNative = (PCODE)NULL;
                         if (dji != NULL)
                         {
+                            LOG((LF_CORDB, LL_INFO10000, "DS::TP dji != null\n"));
                             mdNative = dji->m_nativeCodeVersion.GetMethodDesc();
                             pcodeNative = dji->m_nativeCodeVersion.GetNativeCode();
                         }
                         else
                         {
+                            LOG((LF_CORDB, LL_INFO10000, "DS::TP Find the method the return is to\n"));
                             // Find the method that the return is to.
                             mdNative = g_pEEInterface->GetNativeCodeMethodDesc(dac_cast<PCODE>(traceManagerRetAddr));
                             _ASSERTE(g_pEEInterface->GetFunctionAddress(mdNative) != (PCODE)NULL);
@@ -7112,11 +7221,13 @@ TP_RESULT DebuggerStepper::TriggerPatch(DebuggerControllerPatch *patch,
                              dji));
 
                         // Place the patch.
+                        LOG((LF_CORDB, LL_INFO10000, "DS::TP about to place the patch where the TraceManager function told us to.\n"));
                         AddBindAndActivateNativeManagedPatch(mdNative,
                                  dji,
                                  offsetRet,
                                  LEAF_MOST_FRAME,
                                  NULL);
+                        LOG((LF_CORDB, LL_INFO10000, "DS::TP ABAANMP has returned inside TriggerPatch.\n"));
                     }
                     else
                     {
@@ -7140,7 +7251,7 @@ TP_RESULT DebuggerStepper::TriggerPatch(DebuggerControllerPatch *patch,
 
             EnableTraceCall(LEAF_MOST_FRAME);
             EnableUnwind(m_fp);
-
+            LOG((LF_CORDB, LL_INFO10000, "DS::TP About to return from TriggerPatch with TPR_IGNORE.\n"));
             return TPR_IGNORE;
         }
         else
@@ -7553,6 +7664,34 @@ void DebuggerStepper::TriggerUnwind(Thread *thread,
     m_reason = unwindReason;
 }
 
+void DebuggerStepper::TriggerMulticastDelegate(BYTE* pDel, INT32 delegateCount)
+{
+    TraceDestination trace;
+    FramePointer fp = LEAF_MOST_FRAME;
+    LOG((LF_CORDB, LL_INFO1000, "DebugStepper::TriggerMulticastDelegate.\n"));
+    int totalDelegateCount = (int)*(size_t*)((BYTE*)pDel + DelegateObject::GetOffsetOfInvocationCount());
+    if (delegateCount == totalDelegateCount)
+    {
+        LOG((LF_CORDB, LL_INFO1000, "ILSM::TraceManager: Fired all delegates\n"));
+    }
+    else
+    {
+        LOG((LF_CORDB, LL_INFO1000, "ILSM::TraceManager: Fired %d of %d delegates\n", delegateCount, totalDelegateCount));
+        BYTE *pbDelInvocationList = *(BYTE **)((BYTE*)pDel + DelegateObject::GetOffsetOfInvocationList());
+
+        BYTE* pbDel = *(BYTE**)( ((ArrayBase *)pbDelInvocationList)->GetDataPtr() +
+                            ((ArrayBase *)pbDelInvocationList)->GetComponentSize()*delegateCount);
+        _ASSERTE(pbDel);
+        StubLinkStubManager::TraceDelegateObject(pbDel, &trace);
+    }
+
+    LOG((LF_CORDB, LL_INFO1000, "DebugStepper::TMCD Done with TraceDelegateObject.\n"));
+    //somewhere I need to check to see which delegate we are on.
+    g_pEEInterface->FollowTrace(&trace);
+    LOG((LF_CORDB, LL_INFO1000, "DebugStepper::TriggerMulticastDelegate done with FollowTrace.\n"));
+    PatchTrace(&trace, fp, false); //Value of last bool only matters for the TRACE_UMNANAGED case, we are in the TRACE_MGR_PUSH case
+    //Does it matter what we return from these functions?
+}
 
 // Prepare for sending an event.
 // This is called 1:1 w/ SendEvent, but this method can be called in a GC_TRIGGERABLE context

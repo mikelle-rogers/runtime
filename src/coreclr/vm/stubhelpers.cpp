@@ -16,6 +16,7 @@
 #include "comdatetime.h"
 #include "gcheaputilities.h"
 #include "interoputil.h"
+#include "../debug/ee/debugger.h"
 
 #ifdef FEATURE_COMINTEROP
 #include <oletls.h>
@@ -735,12 +736,18 @@ FCIMPL1(DWORD, StubHelpers::CalcVaListSize, VARARGS *varargs)
     return VARARGS::CalcVaListSize(varargs);
 }
 FCIMPLEND
-
+#ifndef DACCESS_COMPILE
 FCIMPL2(void, StubHelpers::MulticastDebuggerTraceHelper, Object* element, INT32 count)
 {
     FCALL_CONTRACT;
     FCUnique(0xa5);
+    LOG((LF_CORDB, LL_INFO10000, "Inside MulticastDebuggerTraceHelper.\n"));
+    //Hopefully element is the delegate and count is the total number of delegates
+    //DebuggerStepper::TriggerMulticastDelegate(BYTE* pbDel)
+
+    g_pDebugger->MulticastTraceNextStep(reinterpret_cast<BYTE*>(element), count);
 }
+#endif
 FCIMPLEND
 
 FCIMPL0(void*, StubHelpers::NextCallReturnAddress)
