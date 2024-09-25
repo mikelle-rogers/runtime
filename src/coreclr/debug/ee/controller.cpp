@@ -3954,6 +3954,7 @@ void DebuggerController::DispatchMulticastDelegate(BYTE* pbDel, INT32 countDel)
             if ((p->GetThread() == NULL) || (p->GetThread() == pThread))
             {
                 p->TriggerMulticastDelegate(pbDel, countDel);
+                p->DisableMultiCastDelegate();
             }
         }
         p = p->m_next;
