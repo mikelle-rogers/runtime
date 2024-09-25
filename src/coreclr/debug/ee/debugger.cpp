@@ -975,6 +975,12 @@ Debugger::Debugger()
 #else
         FALSE;
 #endif
+    m_MacOSARMBreakpointEnabled = 
+#if defined(OUT_OF_PROCESS_BREAKPOINTNEEDED) && !defined(DACCESS_COMPILE)
+        = TRUE;
+#else
+        = FALSE;
+#endif
 }
 
 /******************************************************************************
@@ -16824,7 +16830,43 @@ BOOL Debugger::IsOutOfProcessSetContextEnabled()
     return FALSE;
 }
 #endif // OUT_OF_PROCESS_SETTHREADCONTEXT
-#endif // DACCESS_COMPILE
 
-#endif //DEBUGGING_SUPPORTED
+#ifndef DACCESS_COMPILE
+#ifdef OUT_OF_PROCESS_BREAKPOINTNEEDED
+
+void Debugger::SendMacOSARMBreakpointNeeded()
+{
+    //This is where I need to work on the MacOS ARM breakpoint
+    if (!m_MacOSARMBreakpointEnabled)
+    {
+        return;
+    }
+    //Pack up all the info that I need to send this message to the debugger
+    //What info does the debugger need? The address of the breakpoint
+    //Second, if the breakpoint is being set or being removed
+    //If it is being set, then you want the cc or int 3 instruction to put at the address
+    //If it is being removed, then you want to put the original instruction back at the address
+    //Call the flare function inside of this function
+    //The flare function is the piece of assembly code
+    //This is my flare's name: MacOSARMBreakpointNeededFlare
+    //The thing that is left is in the mscordbi side, it recognizes that this
+    //breakpoint is set or removed and it calls the correct thing
+}
+
+BOOL Debugger::IsMacOSArmBreakpointEnabled()
+{
+    return m_MacOSARMBreakpointEnabled;
+}
+#else
+void Debugger::SendMacOSARMBreakpointNeeded()
+{
+    _ASSERTE(!"SendMacOSARMBreakpointNeeded is not enabled on this platform");
+}
+BOOL Debugger::IsMacOSArmBreakpointEnabled()
+{
+    return FALSE;
+}
+
+#endif // OUT_OF_PROCESS_BREAKPOINTNEEDED
+#endif // DACCESS_COMPILE
 

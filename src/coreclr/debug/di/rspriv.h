@@ -3288,6 +3288,9 @@ public:
     void HandleSetThreadContextNeeded(DWORD dwThreadId);
 #endif
 
+#ifdef OUT_OF_PROCESS_BREAKPOINTNEEDED
+    void HandleSendMacOSARMBreakpointNeeded(CORDB_ADDRESS breakpointAddress, WORD opcode)
+#endif
     //
     // Shim  callbacks to simulate fake attach events.
     //

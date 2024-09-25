@@ -11308,6 +11308,18 @@ void CordbProcess::HandleSetThreadContextNeeded(DWORD dwThreadId)
 }
 #endif // OUT_OF_PROCESS_SETTHREADCONTEXT
 
+#ifdef OUT_OF_PROCESS_BREAKPOINTNEEDED
+void CordbProcess::void HandleSendMacOSARMBreakpointNeeded(CORDB_ADDRESS breakpointAddress, WORD opcode)
+{
+    LOG((LF_CORDB, LL_INFO10000, "RS HandleBreakpointNeeded\n"));
+    #if defined(__APPLE__) && defined(TARGET_ARM64)
+    // We need to write the breakpoint instruction to the target address
+    #else
+        #error Platform not supported
+    #endif
+}
+#endif
+
 //
 // If the thread has an unhandled managed exception, hijack it.
 //

@@ -52,7 +52,9 @@ inline PRD_TYPE CORDbgGetInstructionExImpl(UNALIGNED CORDB_ADDRESS_TYPE* address
 inline void CORDbgInsertBreakpoint(UNALIGNED CORDB_ADDRESS_TYPE *address)
 {
     LIMITED_METHOD_CONTRACT;
-
+    //On MacOS arm64, we aren't allowed to write a breakpoint in process without an access violation. 
+    //So we will write the breakpoint out of process with the debugger
+    //This is a change
     CORDbgSetInstruction(address, CORDbg_BREAK_INSTRUCTION);
 }
 

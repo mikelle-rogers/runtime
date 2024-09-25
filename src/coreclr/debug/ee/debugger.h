@@ -1912,6 +1912,14 @@ extern "C" void __stdcall SetThreadContextNeededFlare(TADDR pContext, DWORD size
 #endif
 #endif // OUT_OF_PROCESS_SETTHREADCONTEXT
 
+#ifdef OUT_OF_PROCESS_BREAKPOINTNEEDED
+#if defined(__APPLE__) && defined(TARGET_ARM64)
+extern "C" void __stdcall MacOSARMBreakpointNeededFlare();
+#else
+#error Platform not supported
+#endif
+#endif // OUT_OF_PROCESS_BREAKPOINTNEEDED
+
 /* ------------------------------------------------------------------------ *
  * Debugger class
  * ------------------------------------------------------------------------ */
@@ -3096,6 +3104,12 @@ private:
 public:
     void SendSetThreadContextNeeded(CONTEXT *context);
     BOOL IsOutOfProcessSetContextEnabled();
+
+private:
+    BOOL m_MacOSARMBreakpointEnabled;
+public:
+    void SendMacOSARMBreakpointNeeded();
+    BOOL IsMacOSARMBreakpointEnabled();
 };
 
 

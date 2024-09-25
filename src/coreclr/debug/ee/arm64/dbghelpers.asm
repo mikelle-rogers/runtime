@@ -96,6 +96,13 @@ ExceptionHijackEnd
     ret     lr
     LEAF_END
 
+    LEAF_ENTRY MacOSARMBreakpointNeededFlare
+    EMIT_BREAKPOINT
+    ; make sure that the basic block is unique
+    add     x0, x7, x7
+    ret     lr
+    LEAF_END
+
     ; must be at end of file
     END
 
