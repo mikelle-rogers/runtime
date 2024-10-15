@@ -3121,7 +3121,7 @@ EXTERN_C PCODE STDCALL ExternalMethodFixupWorker(TransitionBlock * pTransitionBl
     // System.StubHelpers.StubHelpers.SetLastError() and this was overwriting
     // the value of the Last Error before it could be retrieved and saved.
     //
-
+    LOG((LF_CORDB, LL_EVERYTHING, "At beginning of ExternalMethodFixupWorker\n"));
     PCODE         pCode   = (PCODE)NULL;
 
     BEGIN_PRESERVE_LAST_ERROR;
@@ -3204,6 +3204,7 @@ EXTERN_C PCODE STDCALL ExternalMethodFixupWorker(TransitionBlock * pTransitionBl
         {
         case ENCODE_METHOD_ENTRY:
             {
+                LOG((LF_CORDB, LL_EVERYTHING,"EMFW::ENCODE_METHOD_ENTRY\n"));
                 pMD =  ZapSig::DecodeMethod(pModule,
                                             pInfoModule,
                                             pBlob);
@@ -3221,6 +3222,7 @@ EXTERN_C PCODE STDCALL ExternalMethodFixupWorker(TransitionBlock * pTransitionBl
 
         case ENCODE_METHOD_ENTRY_DEF_TOKEN:
             {
+                LOG((LF_CORDB, LL_EVERYTHING,"EMFW::ENCODE_METHOD_ENTRY_DEF_TOKEN\n"));
                 mdToken MethodDef = TokenFromRid(CorSigUncompressData(pBlob), mdtMethodDef);
                 _ASSERTE(pInfoModule->IsFullModule());
                 pMD = MemberLoader::GetMethodDescFromMethodDef(static_cast<Module*>(pInfoModule), MethodDef, FALSE);
@@ -3238,6 +3240,7 @@ EXTERN_C PCODE STDCALL ExternalMethodFixupWorker(TransitionBlock * pTransitionBl
 
         case ENCODE_METHOD_ENTRY_REF_TOKEN:
             {
+                LOG((LF_CORDB, LL_EVERYTHING,"EMFW::ENCODE_METHOD_ENTRY_REF_TOKEN\n"));
                 SigTypeContext typeContext;
                 mdToken MemberRef = TokenFromRid(CorSigUncompressData(pBlob), mdtMemberRef);
                 FieldDesc * pFD = NULL;
@@ -3258,6 +3261,7 @@ EXTERN_C PCODE STDCALL ExternalMethodFixupWorker(TransitionBlock * pTransitionBl
 
         case ENCODE_VIRTUAL_ENTRY:
             {
+                LOG((LF_CORDB, LL_EVERYTHING,"EMFW::ENCODE_VIRTUAL_ENTRY\n"));
                 pMD = ZapSig::DecodeMethod(pModule, pInfoModule, pBlob, &th);
 
         VirtualEntry:
@@ -3282,6 +3286,7 @@ EXTERN_C PCODE STDCALL ExternalMethodFixupWorker(TransitionBlock * pTransitionBl
 
         case ENCODE_VIRTUAL_ENTRY_DEF_TOKEN:
             {
+                LOG((LF_CORDB, LL_EVERYTHING,"EMFW::ENCODE_VIRTUAL_ENTRY_DEF_TOKEN\n"));
                 mdToken MethodDef = TokenFromRid(CorSigUncompressData(pBlob), mdtMethodDef);
                 _ASSERTE(pInfoModule->IsFullModule());
                 pMD = MemberLoader::GetMethodDescFromMethodDef(static_cast<Module*>(pInfoModule), MethodDef, FALSE);
@@ -3291,6 +3296,7 @@ EXTERN_C PCODE STDCALL ExternalMethodFixupWorker(TransitionBlock * pTransitionBl
 
         case ENCODE_VIRTUAL_ENTRY_REF_TOKEN:
             {
+                LOG((LF_CORDB, LL_EVERYTHING,"EMFW::ENCODE_VIRTUAL_ENTRY_REF_TOKEN\n"));
                 mdToken MemberRef = TokenFromRid(CorSigUncompressData(pBlob), mdtMemberRef);
 
                 FieldDesc * pFD = NULL;
@@ -3304,6 +3310,7 @@ EXTERN_C PCODE STDCALL ExternalMethodFixupWorker(TransitionBlock * pTransitionBl
 
         case ENCODE_VIRTUAL_ENTRY_SLOT:
             {
+                LOG((LF_CORDB, LL_EVERYTHING,"EMFW::VIRTUAL_ENTRY_SLOT\n"));
                 slot = CorSigUncompressData(pBlob);
                 pMT =  ZapSig::DecodeType(pModule, pInfoModule, pBlob).GetMethodTable();
 
@@ -3318,6 +3325,7 @@ EXTERN_C PCODE STDCALL ExternalMethodFixupWorker(TransitionBlock * pTransitionBl
 
         if (fVirtual)
         {
+            LOG((LF_CORDB, LL_EVERYTHING,"EMFW::fVirtual is true\n"));
             GCX_COOP_THREAD_EXISTS(CURRENT_THREAD);
 
             // Get the stub manager for this module
@@ -3342,6 +3350,7 @@ EXTERN_C PCODE STDCALL ExternalMethodFixupWorker(TransitionBlock * pTransitionBl
             }
             else
             {
+                LOG((LF_CORDB, LL_EVERYTHING,"EMFW::we are not an interface.\n"));
                 pCode = pMgr->GetVTableCallStub(slot);
                 *(TADDR *)pIndirection = pCode;
             }
@@ -3349,6 +3358,7 @@ EXTERN_C PCODE STDCALL ExternalMethodFixupWorker(TransitionBlock * pTransitionBl
         }
         else
         {
+            LOG((LF_CORDB, LL_EVERYTHING,"EMFW::fVirtual is false\n"));
             _ASSERTE(pMD != NULL);
 
             {
@@ -3373,6 +3383,7 @@ EXTERN_C PCODE STDCALL ExternalMethodFixupWorker(TransitionBlock * pTransitionBl
             //
             if (!DoesSlotCallPrestub(pCode))
             {
+               LOG((LF_CORDB, LL_EVERYTHING,"EMFW::NotDoesSlotCallPreStub\n"));
                 if (pMD->IsVersionableWithVtableSlotBackpatch())
                 {
                     // The entry point for this method needs to be versionable, so use a FuncPtrStub similarly to what is done
