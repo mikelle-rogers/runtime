@@ -16781,6 +16781,10 @@ void Debugger::MulticastTraceNextStep(DELEGATEREF pbDel, INT32 count)
 {
     DebuggerController::DispatchMulticastDelegate(pbDel, count);
 }
+void Debugger::ExternalMethodFixupNextStep(PCODE address)
+{
+    DebuggerController::DispatchExternalMethodFixup(address);
+}
 #endif //DACCESS_COMPILE
 
 #endif //DEBUGGING_SUPPORTED
