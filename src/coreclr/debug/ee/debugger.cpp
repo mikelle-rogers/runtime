@@ -16793,9 +16793,17 @@ void Debugger::MulticastTraceNextStep(DELEGATEREF pbDel, INT32 count)
 {
     DebuggerController::DispatchMulticastDelegate(pbDel, count);
 }
+
 void Debugger::ExternalMethodFixupNextStep(PCODE address)
 {
     DebuggerController::DispatchExternalMethodFixup(address);
+}
+
+void Debugger::GenericPInvokeCalliNextStep(PCODE address)
+{
+    LOG((LF_CORDB, LL_INFO1000, "GenericPInvokeCalliNextStep:::Inside:::Start\n"));
+    DebuggerController::DispatchGenericPInvokeCalli(address);
+    LOG((LF_CORDB, LL_INFO1000, "GenericPInvokeCalliNextStep:::Inside:::End\n"));
 }
 #endif //DACCESS_COMPILE
 

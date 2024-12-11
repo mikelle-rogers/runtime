@@ -38,6 +38,7 @@
 #include "pinvokeoverride.h"
 #include "nativelibrary.h"
 #include "interoplibinterface.h"
+#include "../debug/ee/debugger.h"
 
 #include <formattype.h>
 #include "../md/compiler/custattr.h"
@@ -5929,6 +5930,7 @@ EXTERN_C void STDCALL GenericPInvokeCalliStubWorker(TransitionBlock * pTransitio
     STATIC_CONTRACT_ENTRY_POINT;
 
     MAKE_CURRENT_THREAD_AVAILABLE();
+    LOG((LF_CORDB, LL_INFO1000, "GenericPInvokeCalliStubWorker\n"));
 
 #ifdef _DEBUG
     Thread::ObjectRefFlush(CURRENT_THREAD);
@@ -5974,7 +5976,8 @@ PCODE GetILStubForCalli(VASigCookie *pVASigCookie, MethodDesc *pMD)
     GCStress<cfg_any>::MaybeTrigger();
 
     GCX_PREEMP();
-
+    
+    LOG((LF_CORDB, LL_INFO1000, "GetILStubForCalli\n"));
     Signature signature = pVASigCookie->signature;
     CorInfoCallConvExtension unmgdCallConv = CorInfoCallConvExtension::Managed;
 
@@ -6069,7 +6072,13 @@ PCODE GetILStubForCalli(VASigCookie *pVASigCookie, MethodDesc *pMD)
 
     UNINSTALL_UNWIND_AND_CONTINUE_HANDLER;
     UNINSTALL_MANAGED_EXCEPTION_DISPATCHER;
-
+    LOG((LF_CORDB, LL_INFO1000, "g_genericPInvokeCalliHelperTraceActiveCount: %d\n", g_genericPInvokeCalliHelperTraceActiveCount));
+    if (g_genericPInvokeCalliHelperTraceActiveCount > 0)
+    {
+        LOG((LF_CORDB, LL_INFO1000, "GenericPInvokeCalliNextStep:::Before\n"));
+        g_pDebugger->GenericPInvokeCalliNextStep(pVASigCookie->pNDirectILStub);
+        LOG((LF_CORDB, LL_INFO1000, "GenericPInvokeCalliNextStep:::Before\n"));
+    }
     RETURN pVASigCookie->pNDirectILStub;
 }
 

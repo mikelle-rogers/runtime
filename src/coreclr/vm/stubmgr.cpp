@@ -29,6 +29,7 @@ const char *GetTType( TraceType tt)
         case TRACE_UNJITTED_METHOD:           return "TRACE_UNJITTED_METHOD";
         case TRACE_MULTICAST_DELEGATE_HELPER: return "TRACE_MULTICAST_DELEGATE_HELPER";
         case TRACE_EXTERNAL_METHOD_FIXUP:     return "TRACE_EXTERNAL_METHOD_FIXUP";
+        case TRACE_GENERIC_PINVOKE_CALLI:     return "TRACE_GENERIC_PINVOKE_CALLI";
     }
     return "TRACE_REALLY_WACKED";
 }
@@ -126,6 +127,10 @@ const CHAR * TraceDestination::DbgToString(SString & buffer)
 
             case TRACE_EXTERNAL_METHOD_FIXUP:
                 pValue = "TRACE_EXTERNAL_METHOD_FIXUP";
+                break;
+            
+            case TRACE_GENERIC_PINVOKE_CALLI:
+                pValue = "TRACE_GENERIC_PINVOKE_CALLI";
                 break;
 
             case TRACE_OTHER:
@@ -438,8 +443,10 @@ BOOL StubManager::CheckIsStub_Worker(PCODE stubStartAddress)
     // @todo - consider having a single check for null right up front.
     // Though this may cover bugs where stub-managers don't handle bad addresses.
     // And someone could just as easily pass (0x01) as NULL.
+    LOG((LF_CORDB, LL_INFO10000,"StubManager::CheckIsStub_Worker entry with address: %p.\n", stubStartAddress));
     if (stubStartAddress == (PCODE)NULL)
     {
+        LOG((LF_CORDB, LL_INFO10000,"StubManager::CheckIsStub_Worker return false.\n"));
         return FALSE;
     }
 
@@ -536,9 +543,11 @@ BOOL StubManager::TraceStub(PCODE stubStartAddress, TraceDestination *trace)
     WRAPPER_NO_CONTRACT;
 
     StubManagerIterator it;
+    LOG((LF_CORDB, LL_INFO10000,"StubManager::TraceStub entry with address: %p.\n", stubStartAddress));
     while (it.Next())
     {
         StubManager * pCurrent = it.Current();
+        LOG((LF_CORDB, LL_INFO10000,"StubManager::TraceStub StubManager: '%s'\n", pCurrent->DbgGetName()));
         if (!pCurrent->CheckIsStub_Worker(stubStartAddress))
             continue;
 
@@ -546,8 +555,9 @@ BOOL StubManager::TraceStub(PCODE stubStartAddress, TraceDestination *trace)
                 "StubManager::TraceStub: '%s' (%p) claimed %p.\n", pCurrent->DbgGetName(), pCurrent, stubStartAddress));
 
         _ASSERTE_IMPL(IsSingleOwner(stubStartAddress, pCurrent));
-
+        LOG((LF_CORDB, LL_INFO10000,"StubManager::TraceStub about to call DoTraceStub1.\n"));
         BOOL fValid = pCurrent->DoTraceStub(stubStartAddress, trace);
+        LOG((LF_CORDB, LL_INFO10000,"StubManager::TraceStub after Do: '%s' (%p) claimed %p.\n", pCurrent->DbgGetName(), pCurrent, stubStartAddress));
 #ifdef _DEBUG
         if (IsStubLoggingEnabled())
         {
@@ -565,9 +575,10 @@ BOOL StubManager::TraceStub(PCODE stubStartAddress, TraceDestination *trace)
             }
         } // logging
 #endif
+        LOG((LF_CORDB, LL_INFO10000,"StubManager::TraceStub about to return %s.\n", fValid ? "true" : "false"));
         return fValid;
     }
-
+    LOG((LF_CORDB, LL_INFO10000,"StubManager::TraceStub end of iterating through stubmanagers.\n"));
     if (ExecutionManager::IsManagedCode(stubStartAddress))
     {
         LOG((LF_CORDB, LL_INFO10000,
@@ -601,7 +612,8 @@ BOOL StubManager::FollowTrace(TraceDestination *trace)
     STATIC_CONTRACT_NOTHROW;
     STATIC_CONTRACT_GC_NOTRIGGER;
     STATIC_CONTRACT_FORBID_FAULT;
-
+    LOG((LF_CORDB, LL_INFO10000, "StubManager::FollowTrace entry\n"));
+    //LOG((LF_CORDB, LL_INFO10000, "StubManager::FollowTrace TraceType: '%s'\n", trace->GetTraceType()));
     while (trace->GetTraceType() == TRACE_STUB)
     {
         LOG((LF_CORDB, LL_INFO10000,
@@ -619,7 +631,7 @@ BOOL StubManager::FollowTrace(TraceDestination *trace)
     }
 
     LOG_TRACE_DESTINATION(trace, (PCODE)NULL, "StubManager::FollowTrace");
-
+    LOG((LF_CORDB, LL_INFO10000, "StubManager::FollowTrace TraceType about to be returned\n"));
     return trace->GetTraceType() != TRACE_OTHER;
 }
 
@@ -1482,7 +1494,7 @@ BOOL JumpStubStubManager::DoTraceStub(PCODE stubStartAddress,
 
     PCODE jumpTarget = decodeBackToBackJump(stubStartAddress);
     trace->InitForStub(jumpTarget);
-
+    LOG((LF_CORDB, LL_INFO10000,"JumpStubMgr\n"));
     LOG_TRACE_DESTINATION(trace, stubStartAddress, "JumpStubStubManager::DoTraceStub");
 
     return TRUE;
@@ -1909,17 +1921,20 @@ BOOL InteropDispatchStubManager::CheckIsStub_Internal(PCODE stubStartAddress)
 #ifdef FEATURE_COMINTEROP
     if (stubStartAddress == GetEEFuncEntryPoint(GenericCLRToCOMCallStub))
     {
+        LOG((LF_CORDB, LL_EVERYTHING, "IDSM::CISI GenericCLRToCOMCallStub\n"));
         return true;
     }
 #endif // FEATURE_COMINTEROP
 
     if (IsVarargPInvokeStub(stubStartAddress))
     {
+        LOG((LF_CORDB, LL_EVERYTHING, "IDSM::CISI IsVarargPInvokeStub\n"));
         return true;
     }
 
     if (stubStartAddress == GetEEFuncEntryPoint(GenericPInvokeCalliHelper))
     {
+        LOG((LF_CORDB, LL_EVERYTHING, "IDSM::CISI GenericPInvokeCalliHelper\n"));
         return true;
     }
 
@@ -1935,11 +1950,19 @@ BOOL InteropDispatchStubManager::DoTraceStub(PCODE stubStartAddress, TraceDestin
 
 #ifndef DACCESS_COMPILE
      _ASSERTE(CheckIsStub_Internal(stubStartAddress));
-
-    trace->InitForManagerPush(stubStartAddress, this);
-
+    if (stubStartAddress == GetEEFuncEntryPoint(GenericPInvokeCalliHelper))
+    {
+        LOG((LF_CORDB, LL_EVERYTHING, "IDSM::DTS InitForGenericPInvokeCalli\n"));
+        trace->InitForGenericPInvokeCalli();
+    }
+    else
+    {
+        LOG((LF_CORDB, LL_EVERYTHING, "IDSM::DTS InitForMAnagerPush before\n"));
+        trace->InitForManagerPush(stubStartAddress, this);
+        LOG((LF_CORDB, LL_EVERYTHING, "IDSM::DTS InitForMAnagerPush after\n"));
+    }
     LOG_TRACE_DESTINATION(trace, stubStartAddress, "InteropDispatchStubManager::DoTraceStub");
-
+    LOG((LF_CORDB, LL_EVERYTHING, "IDSM::DTS about to return True\n"));
     return TRUE;
 
 #else // !DACCESS_COMPILE
@@ -1969,6 +1992,8 @@ BOOL InteropDispatchStubManager::TraceManager(Thread *thread,
     TADDR arg = StubManagerHelpers::GetHiddenArg(pContext);
 
     // IL stub may not exist at this point so we init directly for the target (TODO?)
+
+    LOG((LF_CORDB, LL_EVERYTHING, "InteropDispatchStubManager::TraceManager called\n"));
 
     if (IsVarargPInvokeStub(GetIP(pContext)))
     {

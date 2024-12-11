@@ -950,7 +950,8 @@ DebuggerController::DebuggerController(Thread * pThread, AppDomain * pAppDomain)
     m_deleted(false),
     m_fEnableMethodEnter(false),
     m_multicastDelegateHelper(false),
-    m_externalMethodFixup(false)
+    m_externalMethodFixup(false),
+    m_genericPInvokeCalli(false)
 {
     CONTRACTL
     {
@@ -2303,6 +2304,7 @@ bool DebuggerController::PatchTrace(TraceDestination *trace,
 
         PRECONDITION(ThisMaybeHelperThread());
     }
+    LOG((LF_CORDB, LL_INFO10000, "DC::PT: PatchTrace Beginning: %s\n", trace->GetTraceType()));
     CONTRACTL_END;
     DebuggerControllerPatch *dcp = NULL;
     SIZE_T nativeOffset = 0;
@@ -2407,6 +2409,10 @@ bool DebuggerController::PatchTrace(TraceDestination *trace,
 
     case TRACE_EXTERNAL_METHOD_FIXUP:
         EnableExternalMethodFixup();
+        return true;
+    
+    case TRACE_GENERIC_PINVOKE_CALLI:
+        EnableGenericPInvokeCalli();
         return true;
 
     case TRACE_OTHER:
@@ -4055,6 +4061,74 @@ void DebuggerController::DispatchExternalMethodFixup(PCODE addr)
         p = p->m_next;
     }
 }
+
+void DebuggerController::EnableGenericPInvokeCalli()
+{
+    CONTRACTL
+    {
+        NOTHROW;
+        GC_NOTRIGGER;
+    }
+    CONTRACTL_END;
+
+    ControllerLockHolder chController;
+    if (!m_genericPInvokeCalli)
+    {
+        LOG((LF_CORDB, LL_INFO1000000, "DC::EnableGenericPInvokeCalli, this=%p, previously disabled\n", this));
+        m_genericPInvokeCalli = true;
+        g_genericPInvokeCalliHelperTraceActiveCount += 1;
+    }
+    else
+    {
+        LOG((LF_CORDB, LL_INFO1000000, "DC::EnableGenericPInvokeCalli, this=%p, already set\n", this));
+    }
+}
+
+void DebuggerController::DisableGenericPInvokeCalli()
+{
+    CONTRACTL
+    {
+        NOTHROW;
+        GC_NOTRIGGER;
+    }
+    CONTRACTL_END;
+
+    ControllerLockHolder chController;
+    if (m_genericPInvokeCalli)
+    {
+        LOG((LF_CORDB, LL_INFO10000, "DC::DisableGenericPInvokeCalli, this=%p, previously set\n", this));
+        m_genericPInvokeCalli = false;
+        g_genericPInvokeCalliHelperTraceActiveCount -= 1;
+    }
+    else
+    {
+        LOG((LF_CORDB, LL_INFO10000, "DC::DisableGenericPInvokeCalli, this=%p, already disabled\n", this));
+    }
+}
+
+// // Loop through controllers and dispatch 
+void DebuggerController::DispatchGenericPInvokeCalli(PCODE addr)
+{
+    Thread * pThread = g_pEEInterface->GetThread();
+    _ASSERTE(pThread  != NULL);
+
+    ControllerLockHolder lockController;
+
+    DebuggerController *p = g_controllers;
+    while (p != NULL)
+    {
+        if (p->m_genericPInvokeCalli)
+        {
+            if ((p->GetThread() == NULL) || (p->GetThread() == pThread))
+            {
+                LOG((LF_CORDB, LL_INFO1000, "DispatchGenericPInvokeCalli:::Before\n"));
+                p->TriggerGenericPInvokeCalli(addr);
+                LOG((LF_CORDB, LL_INFO1000, "DispatchGenericPInvokeCalli:::After\n"));
+            }
+        }
+        p = p->m_next;
+    }
+}
 //
 // AddProtection adds page protection to (at least) the given range of
 // addresses
@@ -4206,6 +4280,10 @@ void DebuggerController::TriggerMulticastDelegate(DELEGATEREF pDel, INT32 delega
 void DebuggerController::TriggerExternalMethodFixup(PCODE target)
 {
     _ASSERTE(!"This code should be unreachable. If your controller enables ExternalMethodFixup events, it should also override this callback to do something useful when the event arrives.");
+}
+void DebuggerController::TriggerGenericPInvokeCalli(PCODE target)
+{
+    _ASSERTE(!"This code should be unreachable. If your controller enables GenericPInvokeCalli events, it should also override this callback to do something useful when the event arrives.");
 }
 
 
@@ -5675,6 +5753,7 @@ bool DebuggerStepper::TrapStepInto(ControllerStackInfo *info,
         LOG((LF_CORDB, LL_INFO1000, "DS::TSI Failed to step into\n"));
         return false;
     }
+    LOG((LF_CORDB, LL_INFO1000, "DS::TSI Did not fail to step into\n"));
 
 
     (*pTD) = trace; //bitwise copy
@@ -5796,6 +5875,7 @@ static bool IsTailCallJitHelper(const BYTE * ip)
 // function detects that case to be used for those scenarios.
 static bool IsTailCall(const BYTE * ip, ControllerStackInfo* info, TailCallFunctionType type)
 {
+    LOG((LF_CORDB, LL_INFO10000, "IsTailCall beginning\n"));
     MethodDesc* pTailCallDispatcherMD = TailCallHelp::GetTailCallDispatcherMD();
     if (pTailCallDispatcherMD == NULL && type == TailCallFunctionType::TailCallThatReturns)
     {
@@ -5803,8 +5883,10 @@ static bool IsTailCall(const BYTE * ip, ControllerStackInfo* info, TailCallFunct
     }
 
     TraceDestination trace;
+    LOG((LF_CORDB, LL_INFO10000, "IsTailCall before calling TraceStub and maybe FollowTrace\n"));
     if (!g_pEEInterface->TraceStub(ip, &trace) || !g_pEEInterface->FollowTrace(&trace))
     {
+        LOG((LF_CORDB, LL_INFO10000, "IsTailCall Made it into the if statement\n"));
         return false;
     }
 
@@ -5902,7 +5984,7 @@ bool DebuggerStepper::TrapStep(ControllerStackInfo *info, bool in)
                     TraceDestination trace;
 
                     CONTRACT_VIOLATION(GCViolation); // TraceFrame GC-triggers
-
+                    LOG((LF_CORDB, LL_INFO1000, "DS::TS Will PatchTrace be here?\n"));
                     // This could be anywhere, especially b/c step could be on non-leaf frame.
                     if (g_pEEInterface->TraceFrame(this->GetThread(),
                                                    info->m_activeFrame.frame,
@@ -6508,7 +6590,7 @@ void DebuggerStepper::TrapStepOut(ControllerStackInfo *info, bool fForceTraditio
             TraceDestination trace;
 
             EnableTraceCall(info->m_activeFrame.fp);
-
+            LOG((LF_CORDB, LL_INFO1000, "DS::TS Will patchtrace be called in TrapStepOut\n"));
             PCODE ip = GetControlPC(&(info->m_activeFrame.registers));
             if (g_pEEInterface->TraceStub((BYTE*)ip, &trace)
                 && g_pEEInterface->FollowTrace(&trace)
@@ -6665,7 +6747,7 @@ void DebuggerStepper::TrapStepOut(ControllerStackInfo *info, bool fForceTraditio
                 EnableTraceCall(info->m_activeFrame.fp);
 
                 CONTRACT_VIOLATION(GCViolation); // TraceFrame GC-triggers
-
+                LOG((LF_CORDB, LL_INFO1000, "DS::TS Will PT be called in TrapStepOut2?\n"));
                 if (g_pEEInterface->TraceFrame(GetThread(),
                                                info->m_activeFrame.frame, FALSE,
                                                &trace, &(info->m_activeFrame.registers))
@@ -7279,7 +7361,7 @@ TP_RESULT DebuggerStepper::TriggerPatch(DebuggerControllerPatch *patch,
             // we didn't predict the call target properly.
             EnableJMCBackStop(NULL);
 
-
+            LOG((LF_CORDB, LL_INFO1000, "DS::TP PatchTrace to be called in triggerpatch\n"));
             if (!traceOk
                 || !g_pEEInterface->FollowTrace(&trace)
                 || !PatchTrace(&trace, frameFP,
@@ -7818,6 +7900,19 @@ void DebuggerStepper::TriggerExternalMethodFixup(PCODE target)
     //fStopInUnmanaged only matters for TRACE_UNMANAGED
     PatchTrace(&trace, fp, /*fStopInUnmanaged*/false);
     this->DisableExternalMethodFixup();
+}
+
+void DebuggerStepper::TriggerGenericPInvokeCalli(PCODE target)
+{
+    TraceDestination trace;
+    FramePointer fp = LEAF_MOST_FRAME;
+
+    trace.InitForStub(target);
+    g_pEEInterface->FollowTrace(&trace);
+    //fStopInUnmanaged only matters for TRACE_UNMANAGED
+    LOG((LF_CORDB, LL_INFO1000, "DS::TGPIC PatchTrace to be called\n"));
+    PatchTrace(&trace, fp, /*fStopInUnmanaged*/false);
+    this->DisableGenericPInvokeCalli();
 }
 
 // Prepare for sending an event.
