@@ -1145,6 +1145,8 @@ void DebuggerController::DisableAll()
             DisableMultiCastDelegate();
         if (m_externalMethodFixup)
             DisableExternalMethodFixup();
+        if (m_genericPInvokeCalli)
+            DisableGenericPInvokeCalli();
     }
 }
 
@@ -5897,7 +5899,7 @@ static bool IsTailCall(const BYTE * ip, ControllerStackInfo* info, TailCallFunct
 
     if (type == TailCallFunctionType::StoreTailCallArgs)
     {
-        return (pTargetMD->IsDynamicMethod() && pTargetMD->AsDynamicMethodDesc()->GetILStubType() == DynamicMethodDesc::StubTailCallStoreArgs);
+        return (pTargetMD && pTargetMD->IsDynamicMethod() && pTargetMD->AsDynamicMethodDesc()->GetILStubType() == DynamicMethodDesc::StubTailCallStoreArgs);
     }
 
     if (pTargetMD != pTailCallDispatcherMD)
@@ -7759,6 +7761,7 @@ bool DebuggerStepper::TriggerSingleStep(Thread *thread, const BYTE *ip)
 void DebuggerStepper::TriggerTraceCall(Thread *thread, const BYTE *ip)
 {
     LOG((LF_CORDB,LL_INFO10000,"DS::TTC this:0x%x, @ ip:0x%x\n",this,ip));
+    LOG((LF_CORDB,LL_INFO10000,"DS::TTC this:%p, @ ip:%p\n",this,ip));
     TraceDestination trace;
 
     if (IsFrozen())

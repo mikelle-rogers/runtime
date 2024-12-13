@@ -2012,15 +2012,9 @@ BOOL InteropDispatchStubManager::TraceManager(Thread *thread,
     }
     else if (GetIP(pContext) == GetEEFuncEntryPoint(GenericPInvokeCalliHelper))
     {
-#if defined(TARGET_ARM64) && defined(__APPLE__)
-        //On ARM64 Mac, we cannot put a breakpoint inside of GenericPInvokeCalliHelper
-        LOG((LF_CORDB, LL_INFO10000, "IDSM::TraceManager: Skipping on arm64-macOS\n"));
-        return FALSE;
-#else
         PCODE target = (PCODE)arg;
         LOG((LF_CORDB, LL_INFO10000, "IDSM::TraceManager: Unmanaged CALLI case %p\n", target));
-        trace->InitForUnmanaged(target);
-#endif //defined(TARGET_ARM64) && defined(__APPLE__)
+        trace->InitForGenericPInvokeCalli();
     }
 #ifdef FEATURE_COMINTEROP
     else

@@ -285,6 +285,7 @@ void COMToCLRInvokeTarget(PCODE pManagedTarget, OBJECTREF pObject, ComCallMethod
 #ifdef DEBUGGING_SUPPORTED
     if (CORDebuggerTraceCall())
     {
+        LOG((LF_CORDB, LL_INFO10000, "COMToCLRInvokeTarget log, %p\n", pManagedTarget));
         g_pDebugInterface->TraceCall((const BYTE *)pManagedTarget);
     }
 #endif // DEBUGGING_SUPPORTED

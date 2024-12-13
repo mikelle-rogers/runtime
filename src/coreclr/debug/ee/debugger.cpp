@@ -5551,7 +5551,7 @@ void Debugger::TraceCall(const BYTE *code)
     }
     CONTRACTL_END;
 
-
+    LOG((LF_CORDB, LL_INFO10000, "Debugger::TraceCall - on entry: %p\n", code));
     Thread * pCurThread = g_pEEInterface->GetThread();
     // Ensure we never even think about running managed code on the helper thread.
     _ASSERTE(!ThisIsHelperThreadWorker() || !"You're running managed code on the helper thread");
@@ -5573,7 +5573,7 @@ void Debugger::TraceCall(const BYTE *code)
             // establish a FAULT_NOT_FATAL region. This is required since some callers can't
             // tolerate faults.
             FAULT_NOT_FATAL();
-
+            LOG((LF_CORDB, LL_INFO10000, "Debugger::TraceCall - about to call DispatchTraceCall, %p\n", code));
             DebuggerController::DispatchTraceCall(pCurThread, code);
         }
         EX_CATCH

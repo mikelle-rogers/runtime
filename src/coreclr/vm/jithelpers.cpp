@@ -3770,7 +3770,11 @@ NOINLINE static void JIT_ReversePInvokeEnterRare(ReversePInvokeFrame* frame, voi
     // Increment/DecrementTraceCallCount() will bump
     // g_TrapReturningThreads for us.
     if (CORDebuggerTraceCall())
+    {
+        LOG((LF_CORDB, LL_INFO10000, "JIT_ReversePInvokeEnterRare log\n"));
         g_pDebugInterface->TraceCall(pThunk ? (const BYTE*)pThunk->GetManagedTarget() : (const BYTE*)returnAddr);
+    }
+        //g_pDebugInterface->TraceCall(pThunk ? (const BYTE*)pThunk->GetManagedTarget() : (const BYTE*)returnAddr);
 #endif // DEBUGGING_SUPPORTED
 }
 
@@ -3784,7 +3788,11 @@ NOINLINE static void JIT_ReversePInvokeEnterRare2(ReversePInvokeFrame* frame, vo
     // Increment/DecrementTraceCallCount() will bump
     // g_TrapReturningThreads for us.
     if (CORDebuggerTraceCall())
+    {
+        LOG((LF_CORDB, LL_INFO10000, "JIT_ReversePInvokeEnterRare2 log\n"));
         g_pDebugInterface->TraceCall(pThunk ? (const BYTE*)pThunk->GetManagedTarget() : (const BYTE*)returnAddr);
+    }
+        //g_pDebugInterface->TraceCall(pThunk ? (const BYTE*)pThunk->GetManagedTarget() : (const BYTE*)returnAddr);
 #endif // DEBUGGING_SUPPORTED
 }
 
@@ -3828,6 +3836,7 @@ HCIMPL3_RAW(void, JIT_ReversePInvokeEnterTrackTransitions, ReversePInvokeFrame* 
         {
             // If we're in an IL stub, we want to trace the address of the target method,
             // not the next instruction in the stub.
+            LOG((LF_CORDB, LL_INFO10000, "JIT_ReversePInvokeEnterRare2 going to call log\n"));
             JIT_ReversePInvokeEnterRare2(frame, _ReturnAddress(), GetMethod(handle)->IsILStub() ? (UMEntryThunk*)secretArg : (UMEntryThunk*)NULL);
         }
     }
@@ -3863,6 +3872,7 @@ HCIMPL1_RAW(void, JIT_ReversePInvokeEnter, ReversePInvokeFrame* frame)
         thread->m_fPreemptiveGCDisabled.StoreWithoutBarrier(1);
         if (g_TrapReturningThreads != 0)
         {
+            LOG((LF_CORDB, LL_INFO10000, "JIT_ReversePInvokeEnterRare2 going to call JitReversePInvokeEnter log\n"));
             JIT_ReversePInvokeEnterRare2(frame, _ReturnAddress());
         }
     }

@@ -206,7 +206,12 @@ void * DispatchCallSimple(
 
 #ifdef DEBUGGING_SUPPORTED
     if (CORDebuggerTraceCall())
+    {
+        LOG((LF_CORDB, LL_INFO10000, "DispatchCallSimple log\n"));
         g_pDebugInterface->TraceCall((const BYTE *)pTargetAddress);
+
+    }
+        //g_pDebugInterface->TraceCall((const BYTE *)pTargetAddress);
 #endif // DEBUGGING_SUPPORTED
 
     CallDescrData callDescrData;
@@ -347,6 +352,7 @@ void MethodDescCallSite::CallTargetWorker(const ARG_SLOT *pArguments, ARG_SLOT *
 #ifdef DEBUGGING_SUPPORTED
         if (CORDebuggerTraceCall())
         {
+            LOG((LF_CORDB, LL_INFO10000, "CallTargetWorker, %p\n", m_pCallTarget));
             g_pDebugInterface->TraceCall((const BYTE *)m_pCallTarget);
         }
 #endif // DEBUGGING_SUPPORTED
