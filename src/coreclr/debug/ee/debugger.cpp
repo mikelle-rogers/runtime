@@ -16797,6 +16797,10 @@ void Debugger::ExternalMethodFixupNextStep(PCODE address)
 {
     DebuggerController::DispatchExternalMethodFixup(address);
 }
+void Debugger::PreStubPatchNextStep(PCODE address)
+{
+    DebuggerController::DispatchPreStubPatch(address);
+}
 #endif //DACCESS_COMPILE
 
 #endif //DEBUGGING_SUPPORTED

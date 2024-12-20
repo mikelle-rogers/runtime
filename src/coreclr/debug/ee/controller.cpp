@@ -950,7 +950,8 @@ DebuggerController::DebuggerController(Thread * pThread, AppDomain * pAppDomain)
     m_deleted(false),
     m_fEnableMethodEnter(false),
     m_multicastDelegateHelper(false),
-    m_externalMethodFixup(false)
+    m_externalMethodFixup(false),
+    m_preStubPatch(false)
 {
     CONTRACTL
     {
@@ -1144,6 +1145,8 @@ void DebuggerController::DisableAll()
             DisableMultiCastDelegate();
         if (m_externalMethodFixup)
             DisableExternalMethodFixup();
+        if (m_preStubPatch)
+            DisablePreStubPatch();
     }
 }
 
@@ -2407,6 +2410,10 @@ bool DebuggerController::PatchTrace(TraceDestination *trace,
 
     case TRACE_EXTERNAL_METHOD_FIXUP:
         EnableExternalMethodFixup();
+        return true;
+    
+    case TRACE_PRE_STUB_PATCH:
+        EnablePreStubPatch();
         return true;
 
     case TRACE_OTHER:
@@ -4055,6 +4062,74 @@ void DebuggerController::DispatchExternalMethodFixup(PCODE addr)
         p = p->m_next;
     }
 }
+
+void DebuggerController::EnablePreStubPatch()
+{
+    CONTRACTL
+    {
+        NOTHROW;
+        GC_NOTRIGGER;
+    }
+    CONTRACTL_END;
+
+    ControllerLockHolder chController;
+    if (!m_preStubPatch)
+    {
+        LOG((LF_CORDB, LL_INFO1000000, "DC::EnablePreStubPatch, this=%p, previously disabled\n", this));
+        m_preStubPatch = true;
+        g_preStubPatchTraceActiveCount += 1;
+    }
+    else
+    {
+        LOG((LF_CORDB, LL_INFO1000000, "DC::EnablePreStubPatch, this=%p, already set\n", this));
+    }
+}
+
+void DebuggerController::DisablePreStubPatch()
+{
+    CONTRACTL
+    {
+        NOTHROW;
+        GC_NOTRIGGER;
+    }
+    CONTRACTL_END;
+
+    ControllerLockHolder chController;
+    if (m_preStubPatch)
+    {
+        LOG((LF_CORDB, LL_INFO10000, "DC::DisablePreStubPatch, this=%p, previously set\n", this));
+        m_preStubPatch = false;
+        g_preStubPatchTraceActiveCount -= 1;
+    }
+    else
+    {
+        LOG((LF_CORDB, LL_INFO10000, "DC::DisablePreStubPatch, this=%p, already disabled\n", this));
+    }
+}
+
+// Loop through controllers and dispatch TriggerPreStubPatch
+void DebuggerController::DispatchPreStubPatch(PCODE addr)
+{
+    LOG((LF_CORDB, LL_INFO10000, "DC::DispatchPreStubPatch\n"));
+
+    Thread * pThread = g_pEEInterface->GetThread();
+    _ASSERTE(pThread  != NULL);
+
+    ControllerLockHolder lockController;
+
+    DebuggerController *p = g_controllers;
+    while (p != NULL)
+    {
+        if (p->m_preStubPatch)
+        {
+            if ((p->GetThread() == NULL) || (p->GetThread() == pThread))
+            {
+                p->TriggerPreStubPatch(addr);
+            }
+        }
+        p = p->m_next;
+    }
+}
 //
 // AddProtection adds page protection to (at least) the given range of
 // addresses
@@ -4206,6 +4281,10 @@ void DebuggerController::TriggerMulticastDelegate(DELEGATEREF pDel, INT32 delega
 void DebuggerController::TriggerExternalMethodFixup(PCODE target)
 {
     _ASSERTE(!"This code should be unreachable. If your controller enables ExternalMethodFixup events, it should also override this callback to do something useful when the event arrives.");
+}
+void DebuggerController::TriggerPreStubPatch(PCODE target)
+{
+    _ASSERTE(!"This code should be unreachable. If your controller enables PreStubPatch events, it should also override this callback to do something useful when the event arrives.");
 }
 
 
@@ -7818,6 +7897,18 @@ void DebuggerStepper::TriggerExternalMethodFixup(PCODE target)
     //fStopInUnmanaged only matters for TRACE_UNMANAGED
     PatchTrace(&trace, fp, /*fStopInUnmanaged*/false);
     this->DisableExternalMethodFixup();
+}
+
+void DebuggerStepper::TriggerPreStubPatch(PCODE target)
+{
+    TraceDestination trace;
+    FramePointer fp = LEAF_MOST_FRAME;
+
+    trace.InitForStub(target);
+    g_pEEInterface->FollowTrace(&trace);
+    //fStopInUnmanaged only matters for TRACE_UNMANAGED
+    PatchTrace(&trace, fp, /*fStopInUnmanaged*/false);
+    this->DisablePreStubPatch();
 }
 
 // Prepare for sending an event.

@@ -477,14 +477,6 @@ NESTED_ENTRY NDirectImportThunk, _TEXT, NoHandler
     EPILOG_BRANCH_REG  t4
 NESTED_END NDirectImportThunk, _TEXT
 
-// ------------------------------------------------------------------
-// ThePreStubPatch()
-LEAF_ENTRY ThePreStubPatch, _TEXT
-.globl C_FUNC(ThePreStubPatchLabel)
-C_FUNC(ThePreStubPatchLabel):
-    ret
-LEAF_END ThePreStubPatch, _TEXT
-
 NESTED_ENTRY TheUMEntryPrestub, _TEXT, UnhandledExceptionHandlerUnix
     // Save arguments and return address
     PROLOG_SAVE_REG_PAIR_INDEXED  fp, ra, 0xa0
