@@ -52,8 +52,6 @@ EXTERN_C void DeleteFromPitchingCandidate(MethodDesc* pMD);
 EXTERN_C void MarkMethodNotPitchingCandidate(MethodDesc* pMD);
 #endif
 
-EXTERN_C void STDCALL ThePreStubPatch();
-
 #if defined(HAVE_GCCOVER)
 CrstStatic MethodDesc::m_GCCoverCrst;
 
@@ -2601,7 +2599,11 @@ static PCODE PreStubWorker_Preemptive(
         HardwareExceptionHolder;
 
         // Give debugger opportunity to stop here
-        ThePreStubPatch();
+        if (g_preStubPatchTraceActiveCount > 0)
+        {
+            LOG((LF_CORDB, LL_EVERYTHING, "PreStubWorker_Preemptive calling NextStep.\n"));
+            g_pDebugger->PreStubPatchNextStep(pbRetVal);
+        }
     }
 
     return pbRetVal;
@@ -2706,7 +2708,12 @@ extern "C" PCODE STDCALL PreStubWorker(TransitionBlock* pTransitionBlock, Method
             HardwareExceptionHolder;
 
             // Give debugger opportunity to stop here
-            ThePreStubPatch();
+            LOG((LF_CORDB, LL_EVERYTHING, "PreStubWorker g_preStubPatchTraceActiveCount: %d.\n", g_preStubPatchTraceActiveCount));
+            if (g_preStubPatchTraceActiveCount > 0)
+            {
+                LOG((LF_CORDB, LL_EVERYTHING, "PreStubWorker calling NextStep.\n"));
+                g_pDebugger->PreStubPatchNextStep(pbRetVal);
+            }
         }
 
         pPFrame->Pop(CURRENT_THREAD);

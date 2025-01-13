@@ -538,14 +538,6 @@ NESTED_ENTRY VirtualMethodFixupStub, _TEXT, NoHandler
 NESTED_END VirtualMethodFixupStub, _TEXT
 #endif // FEATURE_PREJIT
 
-// ------------------------------------------------------------------
-// ThePreStubPatch()
-LEAF_ENTRY ThePreStubPatch, _TEXT
-.globl C_FUNC(ThePreStubPatchLabel)
-C_FUNC(ThePreStubPatchLabel):
-    jirl  $r0, $ra, 0
-LEAF_END ThePreStubPatch, _TEXT
-
 #ifdef FEATURE_PREJIT
 // ------------------------------------------------------------------
 // void StubDispatchFixupStub(args in regs $a0-$a7 & stack, $t1:IndirectionCellAndFlags)

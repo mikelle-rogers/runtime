@@ -950,7 +950,8 @@ DebuggerController::DebuggerController(Thread * pThread, AppDomain * pAppDomain)
     m_deleted(false),
     m_fEnableMethodEnter(false),
     m_multicastDelegateHelper(false),
-    m_externalMethodFixup(false)
+    m_externalMethodFixup(false),
+    m_preStubPatch(false)
 {
     CONTRACTL
     {
@@ -1144,6 +1145,8 @@ void DebuggerController::DisableAll()
             DisableMultiCastDelegate();
         if (m_externalMethodFixup)
             DisableExternalMethodFixup();
+        if (m_preStubPatch)
+            DisablePreStubPatch();
     }
 }
 
@@ -2407,6 +2410,10 @@ bool DebuggerController::PatchTrace(TraceDestination *trace,
 
     case TRACE_EXTERNAL_METHOD_FIXUP:
         EnableExternalMethodFixup();
+        return true;
+
+    case TRACE_PRE_STUB_PATCH:
+        EnablePreStubPatch();
         return true;
 
     case TRACE_OTHER:
@@ -4055,6 +4062,74 @@ void DebuggerController::DispatchExternalMethodFixup(PCODE addr)
         p = p->m_next;
     }
 }
+
+void DebuggerController::EnablePreStubPatch()
+{
+    CONTRACTL
+    {
+        NOTHROW;
+        GC_NOTRIGGER;
+    }
+    CONTRACTL_END;
+
+    ControllerLockHolder chController;
+    if (!m_preStubPatch)
+    {
+        LOG((LF_CORDB, LL_INFO1000000, "DC::EnablePreStubPatch, this=%p, previously disabled\n", this));
+        m_preStubPatch = true;
+        g_preStubPatchTraceActiveCount += 1;
+    }
+    else
+    {
+        LOG((LF_CORDB, LL_INFO1000000, "DC::EnablePreStubPatch, this=%p, already set\n", this));
+    }
+}
+
+void DebuggerController::DisablePreStubPatch()
+{
+    CONTRACTL
+    {
+        NOTHROW;
+        GC_NOTRIGGER;
+    }
+    CONTRACTL_END;
+
+    ControllerLockHolder chController;
+    if (m_preStubPatch)
+    {
+        LOG((LF_CORDB, LL_INFO10000, "DC::DisablePreStubPatch, this=%p, previously set\n", this));
+        m_preStubPatch = false;
+        g_preStubPatchTraceActiveCount -= 1;
+    }
+    else
+    {
+        LOG((LF_CORDB, LL_INFO10000, "DC::DisablePreStubPatch, this=%p, already disabled\n", this));
+    }
+}
+
+// Loop through controllers and dispatch TriggerPreStubPatch
+void DebuggerController::DispatchPreStubPatch(PCODE addr)
+{
+    LOG((LF_CORDB, LL_INFO10000, "DC::DispatchPreStubPatch, address: %p\n", addr));
+
+    Thread * pThread = g_pEEInterface->GetThread();
+    _ASSERTE(pThread  != NULL);
+
+    ControllerLockHolder lockController;
+
+    DebuggerController *p = g_controllers;
+    while (p != NULL)
+    {
+        if (p->m_preStubPatch)
+        {
+            if ((p->GetThread() == NULL) || (p->GetThread() == pThread))
+            {
+                p->TriggerPreStubPatch(addr);
+            }
+        }
+        p = p->m_next;
+    }
+}
 //
 // AddProtection adds page protection to (at least) the given range of
 // addresses
@@ -4206,6 +4281,10 @@ void DebuggerController::TriggerMulticastDelegate(DELEGATEREF pDel, INT32 delega
 void DebuggerController::TriggerExternalMethodFixup(PCODE target)
 {
     _ASSERTE(!"This code should be unreachable. If your controller enables ExternalMethodFixup events, it should also override this callback to do something useful when the event arrives.");
+}
+void DebuggerController::TriggerPreStubPatch(PCODE target)
+{
+    _ASSERTE(!"This code should be unreachable. If your controller enables PreStubPatch events, it should also override this callback to do something useful when the event arrives.");
 }
 
 
@@ -5796,6 +5875,7 @@ static bool IsTailCallJitHelper(const BYTE * ip)
 // function detects that case to be used for those scenarios.
 static bool IsTailCall(const BYTE * ip, ControllerStackInfo* info, TailCallFunctionType type)
 {
+    LOG((LF_CORDB, LL_INFO1000, "Inside IsTailCall\n" ));
     MethodDesc* pTailCallDispatcherMD = TailCallHelp::GetTailCallDispatcherMD();
     if (pTailCallDispatcherMD == NULL && type == TailCallFunctionType::TailCallThatReturns)
     {
@@ -5803,16 +5883,24 @@ static bool IsTailCall(const BYTE * ip, ControllerStackInfo* info, TailCallFunct
     }
 
     TraceDestination trace;
+    LOG((LF_CORDB, LL_INFO1000, "Before TraceStub\n" ));
     if (!g_pEEInterface->TraceStub(ip, &trace) || !g_pEEInterface->FollowTrace(&trace))
     {
+        LOG((LF_CORDB, LL_INFO1000, "Going to return False from TailCall\n" ));
         return false;
     }
-
+    LOG((LF_CORDB, LL_INFO1000, "After the if statement in TailCall\n" ));
+    LOG((LF_CORDB, LL_INFO1000, "The trace is of type: %s\n", GetTType(trace.GetTraceType()) ));
+    if (trace.GetTraceType() == TRACE_PRE_STUB_PATCH)
+    {
+        LOG((LF_CORDB, LL_INFO1000, "The trace type was prestubpatch, returning false.\n" ));
+        return false;
+    }
     MethodDesc* pTargetMD =
         trace.GetTraceType() == TRACE_UNJITTED_METHOD
         ? trace.GetMethodDesc()
         : g_pEEInterface->GetNativeCodeMethodDesc(trace.GetAddress());
-
+    LOG((LF_CORDB, LL_INFO1000, "After the method desc thing\n" ));
     if (type == TailCallFunctionType::StoreTailCallArgs)
     {
         return (pTargetMD && pTargetMD->IsDynamicMethod() && pTargetMD->AsDynamicMethodDesc()->GetILStubType() == DynamicMethodDesc::StubTailCallStoreArgs);
@@ -6049,7 +6137,7 @@ bool DebuggerStepper::TrapStep(ControllerStackInfo *info, bool in)
                     fCallingIntoFunclet = IsAddrWithinMethodIncludingFunclet(ji, info->m_activeFrame.md, walker.GetNextIP()) &&
                         ((CORDB_ADDRESS)(SIZE_T)walker.GetNextIP() != ji->m_addrOfCode);
 #endif
-                    // If we are stepping into a tail call that uses the StoreTailCallArgs 
+                    // If we are stepping into a tail call that uses the StoreTailCallArgs
                     // we need to enable the method enter, otherwise it will behave like a resume
                     if (in && IsTailCall(walker.GetNextIP(), info, TailCallFunctionType::StoreTailCallArgs))
                     {
@@ -7588,9 +7676,9 @@ bool DebuggerStepper::TriggerSingleStep(Thread *thread, const BYTE *ip)
         // Sometimes we can get here with a callstack that is coming from an APC
         // this will disable the single stepping and incorrectly resume an app that the user
         // is stepping through.
-#ifdef FEATURE_THREAD_ACTIVATION        
+#ifdef FEATURE_THREAD_ACTIVATION
         if ((thread->m_State & Thread::TS_DebugWillSync) == 0)
-#endif   
+#endif
         {
             DisableSingleStep();
         }
@@ -7818,6 +7906,18 @@ void DebuggerStepper::TriggerExternalMethodFixup(PCODE target)
     //fStopInUnmanaged only matters for TRACE_UNMANAGED
     PatchTrace(&trace, fp, /*fStopInUnmanaged*/false);
     this->DisableExternalMethodFixup();
+}
+
+void DebuggerStepper::TriggerPreStubPatch(PCODE target)
+{
+    TraceDestination trace;
+    FramePointer fp = LEAF_MOST_FRAME;
+    LOG((LF_CORDB, LL_EVERYTHING, "DebuggerStepper::TriggerPreStubPatch called\n"));
+    trace.InitForStub(target);
+    g_pEEInterface->FollowTrace(&trace);
+    //fStopInUnmanaged only matters for TRACE_UNMANAGED
+    PatchTrace(&trace, fp, /*fStopInUnmanaged*/false);
+    this->DisablePreStubPatch();
 }
 
 // Prepare for sending an event.

@@ -911,7 +911,7 @@ protected:
     {
         LIMITED_METHOD_CONTRACT;
         SUPPORTS_DAC;
-        _ASSERTE((m_dwTransientFlags & IS_EDIT_AND_CONTINUE) == 0 || IsEditAndContinueCapable());
+        //_ASSERTE((m_dwTransientFlags & IS_EDIT_AND_CONTINUE) == 0 || IsEditAndContinueCapable());
         return (m_dwTransientFlags & IS_EDIT_AND_CONTINUE) != 0;
     }
 

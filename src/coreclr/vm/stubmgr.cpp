@@ -11,6 +11,7 @@
 #ifdef FEATURE_COMINTEROP
 #include "olecontexthelpers.h"
 #endif
+#include "../debug/ee/debugger.h"
 
 #ifdef LOGGING
 const char *GetTType( TraceType tt)
@@ -29,6 +30,7 @@ const char *GetTType( TraceType tt)
         case TRACE_UNJITTED_METHOD:           return "TRACE_UNJITTED_METHOD";
         case TRACE_MULTICAST_DELEGATE_HELPER: return "TRACE_MULTICAST_DELEGATE_HELPER";
         case TRACE_EXTERNAL_METHOD_FIXUP:     return "TRACE_EXTERNAL_METHOD_FIXUP";
+        case TRACE_PRE_STUB_PATCH:            return "TRACE_PRE_STUB_PATCH";
     }
     return "TRACE_REALLY_WACKED";
 }
@@ -126,6 +128,10 @@ const CHAR * TraceDestination::DbgToString(SString & buffer)
 
             case TRACE_EXTERNAL_METHOD_FIXUP:
                 pValue = "TRACE_EXTERNAL_METHOD_FIXUP";
+                break;
+
+            case TRACE_PRE_STUB_PATCH:
+                pValue = "TRACE_PRE_STUB_PATCH";
                 break;
 
             case TRACE_OTHER:
@@ -927,8 +933,6 @@ void StubManager::DbgGetLog(SString * pStringOut)
 
 #endif // _DEBUG
 
-extern "C" void STDCALL ThePreStubPatchLabel(void);
-
 //-----------------------------------------------------------
 //-----------------------------------------------------------
 BOOL ThePreStubManager::DoTraceStub(PCODE stubStartAddress, TraceDestination *trace)
@@ -948,15 +952,9 @@ BOOL ThePreStubManager::DoTraceStub(PCODE stubStartAddress, TraceDestination *tr
     // We cannot tell where the stub will end up
     // until after the prestub worker has been run.
     //
-#if defined(TARGET_ARM64) && defined(__APPLE__)
-    // On ARM64 Mac, we cannot put a breakpoint inside of ThePreStubPatchLabel
-    LOG((LF_CORDB, LL_INFO10000, "TPSM::DoTraceStub: Skipping on arm64-macOS\n"));
-    return FALSE;
-#else
-    trace->InitForFramePush(GetEEFuncEntryPoint(ThePreStubPatchLabel));
+    trace->InitForPreStubPatch();
 
     return TRUE;
-#endif //defined(TARGET_ARM64) && defined(__APPLE__)
 }
 
 //-----------------------------------------------------------
@@ -1083,6 +1081,7 @@ BOOL PrecodeStubManager::DoTraceStub(PCODE stubStartAddress,
         }
 
         pMD = pPrecode->GetMethodDesc();
+        LOG((LF_CORDB, LL_EVERYTHING, "PrecodeStubManager::DoTraceStub methodDesc name: %s\n", pMD->m_pszDebugMethodName));
     }
 
     PREFIX_ASSUME(pMD != NULL);
