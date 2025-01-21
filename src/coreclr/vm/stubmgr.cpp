@@ -3,6 +3,7 @@
 
 
 #include "common.h"
+#include "precode.h"
 #include "stubmgr.h"
 #include "virtualcallstub.h"
 #include "dllimportcallback.h"
@@ -12,7 +13,7 @@
 #include "olecontexthelpers.h"
 #endif
 #include "../debug/ee/debugger.h"
-
+// Precode* g_ppPrecode;
 #ifdef LOGGING
 const char *GetTType( TraceType tt)
 {
@@ -540,7 +541,9 @@ PTR_StubManager StubManager::FindStubManager(PCODE stubAddress)
 BOOL StubManager::TraceStub(PCODE stubStartAddress, TraceDestination *trace)
 {
     WRAPPER_NO_CONTRACT;
-
+    LOG((LF_CORDB, LL_EVERYTHING, "StubManager::TraceStub Calling GetTarget error.\n"));
+    // PCODE target_temp = g_ppPrecode->GetTarget();
+    // LOG((LF_CORDB, LL_EVERYTHING, "StubManager::TraceStub Target: %p\n", target_temp));
     StubManagerIterator it;
     while (it.Next())
     {
@@ -552,7 +555,9 @@ BOOL StubManager::TraceStub(PCODE stubStartAddress, TraceDestination *trace)
                 "StubManager::TraceStub: '%s' (%p) claimed %p.\n", pCurrent->DbgGetName(), pCurrent, stubStartAddress));
 
         _ASSERTE_IMPL(IsSingleOwner(stubStartAddress, pCurrent));
-
+        LOG((LF_CORDB, LL_EVERYTHING, "SM::TS Calling GetTarget error.\n"));
+        // target_temp = g_ppPrecode->GetTarget();
+        // LOG((LF_CORDB, LL_EVERYTHING, "SM::TS Target: %p\n", target_temp));
         BOOL fValid = pCurrent->DoTraceStub(stubStartAddress, trace);
 #ifdef _DEBUG
         if (IsStubLoggingEnabled())
@@ -613,6 +618,10 @@ BOOL StubManager::FollowTrace(TraceDestination *trace)
         LOG((LF_CORDB, LL_INFO10000,
              "StubManager::FollowTrace: TRACE_STUB for %p\n",
              trace->GetAddress()));
+        LOG((LF_CORDB, LL_EVERYTHING, "StubManager::FollowTrace Calling GetTarget experiment.\n"));
+        // Precode * experiment = (Precode *)trace->GetAddress();
+        // PCODE target_temp = g_ppPrecode->GetTarget();
+        // LOG((LF_CORDB, LL_EVERYTHING, "StubManager::FollowTrace Target: %p\n", target_temp));
 
         if (!TraceStub(trace->GetAddress(), trace))
         {
@@ -1018,16 +1027,22 @@ BOOL PrecodeStubManager::DoTraceStub(PCODE stubStartAddress,
     }
     CONTRACTL_END
 
-    LOG((LF_CORDB, LL_EVERYTHING, "PrecodeStubManager::DoTraceStub called\n"));
+    LOG((LF_CORDB, LL_EVERYTHING, "PrecodeStubManager::DoTraceStub called with address %p\n", stubStartAddress));
 
     MethodDesc* pMD = NULL;
 
     {
         // When the target slot points to the fixup part of the fixup precode, we need to compensate
         // for that to get the actual stub address
+        LOG((LF_CORDB, LL_EVERYTHING, "GPFEP about to be called in PSM::DoTraceStub with address %p\n", stubStartAddress - FixupPrecode::FixupCodeOffset));
         Precode* pPrecode = Precode::GetPrecodeFromEntryPoint(stubStartAddress - FixupPrecode::FixupCodeOffset, TRUE /* speculative */);
+        LOG((LF_CORDB, LL_EVERYTHING, "PSM::DTS pPrecode %p\n", (void*)pPrecode));
+        //g_pPrecode
+        // LOG((LF_CORDB, LL_EVERYTHING, "Calling GetTarget earlier for fun.\n"));
+        PCODE target1 = (PCODE)NULL;
         if ((pPrecode == NULL) || (pPrecode->GetType() != PRECODE_FIXUP))
         {
+            LOG((LF_CORDB, LL_EVERYTHING, "Precode::DTS had to go into if statement for precode defn:\n"));
             pPrecode = Precode::GetPrecodeFromEntryPoint(stubStartAddress);
         }
 
@@ -1036,6 +1051,7 @@ BOOL PrecodeStubManager::DoTraceStub(PCODE stubStartAddress,
         switch (pPrecode->GetType())
         {
         case PRECODE_STUB:
+            LOG((LF_CORDB, LL_EVERYTHING, "PrecodeType PRECODE_STUB:\n"));
             break;
 
 #ifdef HAS_NDIRECT_IMPORT_PRECODE
@@ -1057,11 +1073,16 @@ BOOL PrecodeStubManager::DoTraceStub(PCODE stubStartAddress,
 
 #ifdef HAS_FIXUP_PRECODE
         case PRECODE_FIXUP:
+            LOG((LF_CORDB, LL_EVERYTHING, "PrecodeType PRECODE_FIXUP: %p\n", pPrecode));
+            LOG((LF_CORDB, LL_EVERYTHING, "Calling GetTarget earlier for fun.\n"));
+            target1 = pPrecode->GetTarget();
+            LOG((LF_CORDB, LL_EVERYTHING, "target: %p.\n", target1));
             break;
 #endif // HAS_FIXUP_PRECODE
 
 #ifdef HAS_THISPTR_RETBUF_PRECODE
         case PRECODE_THISPTR_RETBUF:
+            LOG((LF_CORDB, LL_EVERYTHING, "PrecodeType PRECODE_THISPTR_RETBUF:\n"));
             break;
 #endif // HAS_THISPTR_RETBUF_PRECODE
 
@@ -1069,13 +1090,17 @@ BOOL PrecodeStubManager::DoTraceStub(PCODE stubStartAddress,
             _ASSERTE_IMPL(!"DoTraceStub: Unexpected precode type");
             break;
         }
-
+        //PCODE fixup = AsFixupPrecode()->GetTarget();
         PCODE target = pPrecode->GetTarget();
-
+        LOG((LF_CORDB, LL_EVERYTHING, "Precode::GetTarget precode, target %p, %p:\n", (void*)pPrecode, target));
         // check if the method has been jitted
         if (!pPrecode->IsPointingToPrestub(target))
         {
+            LOG((LF_CORDB, LL_EVERYTHING, "P::pPrecode inside: %p:\n", (void*)pPrecode));
+            LOG((LF_CORDB, LL_EVERYTHING, "P::InIf target: %p:\n", target));
             trace->InitForStub(target);
+            LOG((LF_CORDB, LL_EVERYTHING, "InIf After Init trace->address() %p:\n", trace->GetAddress()));
+            LOG((LF_CORDB, LL_EVERYTHING, "InIf stubstartAddress %p:\n", stubStartAddress));
             LOG_TRACE_DESTINATION(trace, stubStartAddress, "PrecodeStubManager::DoTraceStub - code");
             return TRUE;
         }

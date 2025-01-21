@@ -416,6 +416,9 @@ GPTR_DECL(EEDbgInterfaceImpl, g_pEEDbgInterfaceImpl);
 GVAL_DECL(DWORD, g_multicastDelegateTraceActiveCount);
 GVAL_DECL(DWORD, g_externalMethodFixupTraceActiveCount);
 GVAL_DECL(DWORD, g_preStubPatchTraceActiveCount);
+GVAL_DECL(DWORD, g_fixupPrecodeCount);
+extern Precode* g_pPrecode;
+GPTR_DECL(Precode, g_pPrecode);
 #endif // DACCESS_COMPILE
 
 #endif // DEBUGGING_SUPPORTED

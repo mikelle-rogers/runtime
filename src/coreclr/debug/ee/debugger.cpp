@@ -16799,6 +16799,9 @@ void Debugger::ExternalMethodFixupNextStep(PCODE address)
 }
 void Debugger::PreStubPatchNextStep(PCODE address)
 {
+    LOG((LF_CORDB, LL_EVERYTHING, "PreStubPatchNextStep Calling GetTarget.\n"));
+    PCODE target_temp = g_pPrecode->GetTarget();
+    LOG((LF_CORDB, LL_EVERYTHING, "PreStubPatchNextStep Target: %p\n", target_temp));
     DebuggerController::DispatchPreStubPatch(address);
 }
 #endif //DACCESS_COMPILE

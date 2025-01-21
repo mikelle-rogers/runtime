@@ -173,6 +173,7 @@ struct StubPrecode
         CONTRACTL_END;
 
         StubPrecodeData *pData = GetData();
+        LOG((LF_CORDB, LL_EVERYTHING, "SetTargetInterlocked,this, target: %p, %p\n", this, pData->Target));
         return InterlockedCompareExchangeT<PCODE>(&pData->Target, (PCODE)target, (PCODE)expected) == expected;
   }
 
@@ -267,7 +268,10 @@ struct FixupPrecode
     PTR_FixupPrecodeData GetData() const
     {
         LIMITED_METHOD_CONTRACT;
-        return dac_cast<PTR_FixupPrecodeData>(dac_cast<TADDR>(this) + GetStubCodePageSize());
+        PTR_FixupPrecodeData p = dac_cast<PTR_FixupPrecodeData>(dac_cast<TADDR>(this) + GetStubCodePageSize());
+        LOG((LF_CORDB, LL_EVERYTHING, "p, this, Target, Methoddesc, : %p, %p, %p, %p\n", (void*)p, this, p->Target, p->MethodDesc));
+        return p;
+        // return dac_cast<PTR_FixupPrecodeData>(dac_cast<TADDR>(this) + GetStubCodePageSize());
     }
 
     TADDR GetMethodDesc()
@@ -519,7 +523,9 @@ public:
     BOOL IsPointingToPrestub()
     {
         WRAPPER_NO_CONTRACT;
-        return IsPointingToPrestub(GetTarget());
+        PCODE target = GetTarget();
+        LOG((LF_CORDB, LL_EVERYTHING, "IPTP: this, target: %p, %p\n", this, target));
+        return IsPointingToPrestub(target);
     }
 
     PCODE GetEntryPoint()
@@ -547,6 +553,7 @@ public:
     static PTR_Precode GetPrecodeFromEntryPoint(PCODE addr, BOOL fSpeculative = FALSE)
     {
         LIMITED_METHOD_DAC_CONTRACT;
+        LOG((LF_CORDB, LL_EVERYTHING, "GetPrecodeFromEntryPoint with addr: %p\n", addr));
 
 #ifdef DACCESS_COMPILE
         // Always use speculative checks with DAC
@@ -554,7 +561,7 @@ public:
 #endif
 
         TADDR pInstr = PCODEToPINSTR(addr);
-
+        LOG((LF_CORDB, LL_EVERYTHING, "pInstr is addr: %p\n", pInstr));
         // Always do consistency check in debug
         if (fSpeculative INDEBUG(|| TRUE))
         {
@@ -566,6 +573,7 @@ public:
         }
 
         PTR_Precode pPrecode = PTR_Precode(pInstr);
+        LOG((LF_CORDB, LL_EVERYTHING, "pPrecode value: %p\n", (void*)pPrecode));
         return pPrecode;
     }
 

@@ -4124,6 +4124,9 @@ void DebuggerController::DispatchPreStubPatch(PCODE addr)
         {
             if ((p->GetThread() == NULL) || (p->GetThread() == pThread))
             {
+                LOG((LF_CORDB, LL_EVERYTHING, "DispatchPreStubPatch Calling GetTarget.\n"));
+                PCODE target_temp = g_pPrecode->GetTarget();
+                LOG((LF_CORDB, LL_EVERYTHING, "DispatchPreStubPatch Target: %p\n", target_temp));
                 p->TriggerPreStubPatch(addr);
             }
         }
@@ -7912,9 +7915,18 @@ void DebuggerStepper::TriggerPreStubPatch(PCODE target)
 {
     TraceDestination trace;
     FramePointer fp = LEAF_MOST_FRAME;
-    LOG((LF_CORDB, LL_EVERYTHING, "DebuggerStepper::TriggerPreStubPatch called\n"));
+    LOG((LF_CORDB, LL_EVERYTHING, "DebuggerStepper::TriggerPreStubPatch called with address %p\n", target));
+    LOG((LF_CORDB, LL_EVERYTHING, "TriggerPreStubPatch Calling GetTarget.\n"));
+    PCODE target_temp = g_pPrecode->GetTarget();
+    LOG((LF_CORDB, LL_EVERYTHING, "TriggerPreStubPatch Target: %p\n", target_temp));
     trace.InitForStub(target);
+    LOG((LF_CORDB, LL_EVERYTHING, "TPSP Calling GetTarget.\n"));
+    target_temp = g_pPrecode->GetTarget();
+    LOG((LF_CORDB, LL_EVERYTHING, "TPSP Target: %p\n", target_temp));
     g_pEEInterface->FollowTrace(&trace);
+    LOG((LF_CORDB, LL_EVERYTHING, "TPSP Calling GetTarget after FollowTrace.\n"));
+    target_temp = g_pPrecode->GetTarget();
+    LOG((LF_CORDB, LL_EVERYTHING, "TPSP Target: %p\n", target_temp));
     //fStopInUnmanaged only matters for TRACE_UNMANAGED
     PatchTrace(&trace, fp, /*fStopInUnmanaged*/false);
     this->DisablePreStubPatch();

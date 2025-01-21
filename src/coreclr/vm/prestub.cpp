@@ -145,6 +145,7 @@ PCODE MethodDesc::DoBackpatch(MethodTable * pMT, MethodTable *pDispatchingMT, BO
             }
 
             // Patch the fake entrypoint if necessary
+            LOG((LF_CORDB, LL_EVERYTHING, "Patch the fake entrypoint if necessary\n"));
             Precode::GetPrecodeFromEntryPoint(pExpected)->SetTargetInterlocked(pTarget);
         }
 
@@ -2589,7 +2590,7 @@ static PCODE PreStubWorker_Preemptive(
     // Make sure the method table is restored, and method instantiation if present
     pMD->CheckRestore();
     CONSISTENCY_CHECK(GetAppDomain()->CheckCanExecuteManagedCode(pMD));
-
+    LOG((LF_CORDB, LL_EVERYTHING, "PreStubWorker_Preemptive calling DoPrestub.\n"));
     pbRetVal = pMD->DoPrestub(NULL, CallerGCMode::Preemptive);
 
     UNINSTALL_UNWIND_AND_CONTINUE_HANDLER;
@@ -2601,7 +2602,7 @@ static PCODE PreStubWorker_Preemptive(
         // Give debugger opportunity to stop here
         if (g_preStubPatchTraceActiveCount > 0)
         {
-            LOG((LF_CORDB, LL_EVERYTHING, "PreStubWorker_Preemptive calling NextStep.\n"));
+            LOG((LF_CORDB, LL_EVERYTHING, "PreStubWorker_Preemptive calling NextStep with address %p.\n", pbRetVal));
             g_pDebugger->PreStubPatchNextStep(pbRetVal);
         }
     }
@@ -2698,6 +2699,7 @@ extern "C" PCODE STDCALL PreStubWorker(TransitionBlock* pTransitionBlock, Method
 
         GCX_PREEMP_THREAD_EXISTS(CURRENT_THREAD);
         {
+            LOG((LF_CORDB, LL_EVERYTHING, "PreStubWorker Calling DoPreStub.\n"));
             pbRetVal = pMD->DoPrestub(pDispatchingMT, CallerGCMode::Coop);
         }
 
@@ -2711,7 +2713,8 @@ extern "C" PCODE STDCALL PreStubWorker(TransitionBlock* pTransitionBlock, Method
             LOG((LF_CORDB, LL_EVERYTHING, "PreStubWorker g_preStubPatchTraceActiveCount: %d.\n", g_preStubPatchTraceActiveCount));
             if (g_preStubPatchTraceActiveCount > 0)
             {
-                LOG((LF_CORDB, LL_EVERYTHING, "PreStubWorker calling NextStep.\n"));
+                PCODE target_temp = g_pPrecode->GetTarget();
+                LOG((LF_CORDB, LL_EVERYTHING, "PreStubWorker calling NextStep with address %p, precode target: %p.\n", pbRetVal, target_temp));
                 g_pDebugger->PreStubPatchNextStep(pbRetVal);
             }
         }
@@ -2889,7 +2892,7 @@ PCODE MethodDesc::DoPrestub(MethodTable *pDispatchingMT, CallerGCMode callerGCMo
 
     if (!IsPointingToPrestub())
     {
-        LOG((LF_CLASSLOADER, LL_INFO10000,
+        LOG((LF_CORDB, LL_EVERYTHING,
             "    In PreStubWorker, method already jitted, backpatching call point\n"));
         #if defined(FEATURE_JIT_PITCHING)
             MarkMethodNotPitchingCandidate(this);
@@ -3013,7 +3016,7 @@ PCODE MethodDesc::DoPrestub(MethodTable *pDispatchingMT, CallerGCMode callerGCMo
             pStub->DecRef();
         }
     }
-
+    LOG((LF_CORDB, LL_EVERYTHING, "MethodDesc::DoPrestub\n"));
     _ASSERTE(!IsPointingToPrestub());
     _ASSERTE(HasStableEntryPoint());
 

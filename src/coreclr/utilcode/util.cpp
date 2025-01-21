@@ -1134,6 +1134,7 @@ uint32_t GetOsPageSize()
         result = GetOsPageSizeUncached();
 
         g_pageSize.StoreWithoutBarrier(result);
+        LOG((LF_CORDB, LL_EVERYTHING, "GetOsPageSize: %d\n", result));
     }
 
     return result;

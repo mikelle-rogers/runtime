@@ -13,7 +13,7 @@
 #ifdef FEATURE_PERFMAP
 #include "perfmap.h"
 #endif
-
+// extern Precode* g_ppPrecode;
 //==========================================================================================
 // class Precode
 //==========================================================================================
@@ -84,7 +84,9 @@ PCODE Precode::GetTarget()
         break;
 #ifdef HAS_FIXUP_PRECODE
     case PRECODE_FIXUP:
+        LOG((LF_CORDB, LL_EVERYTHING, "P::GT PRECODE_FIXUP\n"));
         target = AsFixupPrecode()->GetTarget();
+        LOG((LF_CORDB, LL_EVERYTHING, "P::GT target=%p\n", target));
         break;
 #endif // HAS_FIXUP_PRECODE
 #ifdef HAS_THISPTR_RETBUF_PRECODE
@@ -159,15 +161,24 @@ BOOL Precode::IsPointingToPrestub(PCODE target)
         MODE_ANY;
     }
     CONTRACTL_END;
-
+    LOG((LF_CORDB, LL_EVERYTHING, "Precode::IsPointingToPreStub called, this: %p, target: %p, GetPreStubEntryPoint: %p\n", this, target, GetPreStubEntryPoint()));
+    // if (IsPointingTo(target, GetPreStubEntryPoint()))
+    //     return TRUE;
     if (IsPointingTo(target, GetPreStubEntryPoint()))
+    {
+        LOG((LF_CORDB, LL_EVERYTHING, "IsPointingTo with target: %p, returning true\n", target));
         return TRUE;
+    }
 
 #ifdef HAS_FIXUP_PRECODE
     if (IsPointingTo(target, ((PCODE)this + FixupPrecode::FixupCodeOffset)))
+    {
+        LOG((LF_CORDB, LL_EVERYTHING, "fixup called IsPointingTo with this, target, fixupcodeoffset: %p, %p, %p returning true\n", this, target, FixupPrecode::FixupCodeOffset));
         return TRUE;
+    }
+        // return TRUE;
 #endif
-
+    LOG((LF_CORDB, LL_EVERYTHING, "returning false\n"));
     return FALSE;
 }
 
@@ -224,23 +235,35 @@ Precode* Precode::Allocate(PrecodeType t, MethodDesc* pMD,
 void Precode::Init(Precode* pPrecodeRX, PrecodeType t, MethodDesc* pMD, LoaderAllocator *pLoaderAllocator)
 {
     LIMITED_METHOD_CONTRACT;
-
+    g_fixupPrecodeCount += 1;
+    LOG((LF_CORDB, LL_EVERYTHING, "count, this, pPrecodeRX: %d, %p, %p\n", g_fixupPrecodeCount, this, (PCODE)pPrecodeRX));
+    LOG((LF_CORDB, LL_EVERYTHING, "P::I this, pPrecodeRX: %p, %p:\n", this, (void*)pPrecodeRX));
+    if (g_fixupPrecodeCount == 2086)
+    {
+        LOG((LF_CORDB, LL_EVERYTHING, "setting g_pPrecode to %p\n", this));
+        g_pPrecode = this;
+        // g_ppPrecode = this;
+    }
     switch (t) {
     case PRECODE_STUB:
+        LOG((LF_CORDB, LL_EVERYTHING, "P::I PRECODE_STUB\n"));
         ((StubPrecode*)this)->Init((StubPrecode*)pPrecodeRX, pMD, pLoaderAllocator);
         break;
 #ifdef HAS_NDIRECT_IMPORT_PRECODE
     case PRECODE_NDIRECT_IMPORT:
+        LOG((LF_CORDB, LL_EVERYTHING, "P::I PRECODE_NDIRECT_IMPORT\n"));
         ((NDirectImportPrecode*)this)->Init((NDirectImportPrecode*)pPrecodeRX, pMD, pLoaderAllocator);
         break;
 #endif // HAS_NDIRECT_IMPORT_PRECODE
 #ifdef HAS_FIXUP_PRECODE
     case PRECODE_FIXUP:
+        LOG((LF_CORDB, LL_EVERYTHING, "P::I PRECODE_FIXUP\n"));
         ((FixupPrecode*)this)->Init((FixupPrecode*)pPrecodeRX, pMD, pLoaderAllocator);
         break;
 #endif // HAS_FIXUP_PRECODE
 #ifdef HAS_THISPTR_RETBUF_PRECODE
     case PRECODE_THISPTR_RETBUF:
+        LOG((LF_CORDB, LL_EVERYTHING, "P::I PRECODE_THISPTR_RETBUF\n"));
         ((ThisPtrRetBufPrecode*)this)->Init(pMD, pLoaderAllocator);
         break;
 #endif // HAS_THISPTR_RETBUF_PRECODE
@@ -281,35 +304,44 @@ void Precode::ResetTargetInterlocked()
 BOOL Precode::SetTargetInterlocked(PCODE target, BOOL fOnlyRedirectFromPrestub)
 {
     WRAPPER_NO_CONTRACT;
+    LOG((LF_CORDB, LL_EVERYTHING, "Precode::SetTargetInterlocked, this, target not sure if actually equals anything important: %p, %p\n", this, target));
     _ASSERTE(!IsPointingToPrestub(target));
 
     PCODE expected = GetTarget();
     BOOL ret = FALSE;
-
+    LOG((LF_CORDB, LL_EVERYTHING, "Precode::SetTargetInterlocked this, expected,: %p, %p\n", this, expected));
     if (fOnlyRedirectFromPrestub && !IsPointingToPrestub(expected))
+    {
+        LOG((LF_CORDB, LL_EVERYTHING, "Precode::Went into first if statement, IPTP returned false\n"));
         return FALSE;
+    }
+        // return FALSE;
 
     PrecodeType precodeType = GetType();
     switch (precodeType)
     {
     case PRECODE_STUB:
+        LOG((LF_CORDB, LL_EVERYTHING, "PRECODE_STUB\n"));
         ret = AsStubPrecode()->SetTargetInterlocked(target, expected);
         break;
 
 #ifdef HAS_FIXUP_PRECODE
     case PRECODE_FIXUP:
+        LOG((LF_CORDB, LL_EVERYTHING, "PRECODE_FIXUP\n"));
         ret = AsFixupPrecode()->SetTargetInterlocked(target, expected);
         break;
 #endif // HAS_FIXUP_PRECODE
 
 #ifdef HAS_THISPTR_RETBUF_PRECODE
     case PRECODE_THISPTR_RETBUF:
+        LOG((LF_CORDB, LL_EVERYTHING, "PRECODE_THISPTR_RETBUF\n"));
         ret = AsThisPtrRetBufPrecode()->SetTargetInterlocked(target, expected);
         ClrFlushInstructionCache(this, sizeof(ThisPtrRetBufPrecode), /* hasCodeExecutedBefore */ true);
         break;
 #endif // HAS_THISPTR_RETBUF_PRECODE
 
     default:
+        LOG((LF_CORDB, LL_EVERYTHING, "defaults\n"));
         UnexpectedPrecodeType("Precode::SetTargetInterlocked", precodeType);
         break;
     }
@@ -372,9 +404,9 @@ void StubPrecode::Init(StubPrecode* pPrecodeRX, MethodDesc* pMD, LoaderAllocator
     BYTE type /* = StubPrecode::Type */, TADDR target /* = NULL */)
 {
     WRAPPER_NO_CONTRACT;
-
+    
     StubPrecodeData *pStubData = GetData();
-
+    LOG((LF_CORDB, LL_EVERYTHING, "Target value in StubPrecode::Init: %p\n", pStubData->Target));
     if (pLoaderAllocator != NULL)
     {
         // Use pMD == NULL in all precode initialization methods to allocate the initial jump stub in non-dynamic heap
@@ -382,6 +414,7 @@ void StubPrecode::Init(StubPrecode* pPrecodeRX, MethodDesc* pMD, LoaderAllocator
         if (target == (TADDR)NULL)
             target = GetPreStubEntryPoint();
         pStubData->Target = target;
+        LOG((LF_CORDB, LL_EVERYTHING, "Target value in StubPrecode::Init: %p\n", pStubData->Target));
     }
 
     pStubData->MethodDesc = pMD;
@@ -504,8 +537,9 @@ void FixupPrecode::Init(FixupPrecode* pPrecodeRX, MethodDesc* pMD, LoaderAllocat
     pData->MethodDesc = pMD;
 
     _ASSERTE(GetMethodDesc() == (TADDR)pMD);
-
+    LOG((LF_CORDB, LL_EVERYTHING, "In fizup precode count, this, pPrecodeRX: %d, %p, %p\n", g_fixupPrecodeCount, this, (PCODE)pPrecodeRX));
     pData->Target = (PCODE)pPrecodeRX + FixupPrecode::FixupCodeOffset;
+    LOG((LF_CORDB, LL_EVERYTHING, "Target in FP:I: %p\n", pData->Target));
     pData->PrecodeFixupThunk = GetPreStubEntryPoint();
 }
 
