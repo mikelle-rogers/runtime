@@ -565,7 +565,11 @@ public:
         // Always do consistency check in debug
         if (fSpeculative INDEBUG(|| TRUE))
         {
-            if (!IS_ALIGNED(pInstr, PRECODE_ALIGNMENT) || !IsValidType(PTR_Precode(pInstr)->GetType()))
+            //if (!IS_ALIGNED(pInstr, PRECODE_ALIGNMENT) || !IsValidType(PTR_Precode(pInstr)->GetType()))
+            bool not_isAligned = !IS_ALIGNED(pInstr, PRECODE_ALIGNMENT);
+            bool not_isValidType = !IsValidType(PTR_Precode(pInstr)->GetType());
+            LOG((LF_CORDB, LL_EVERYTHING, "not_isAligned: %d, not_isValidType: %d, precode_alignment: %zu\n", not_isAligned, not_isValidType, PRECODE_ALIGNMENT));
+            if (not_isAligned || not_isValidType)
             {
                 if (fSpeculative) return NULL;
                 _ASSERTE(!"Precode::GetPrecodeFromEntryPoint: Unexpected code in precode");

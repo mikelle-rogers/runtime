@@ -1037,9 +1037,6 @@ BOOL PrecodeStubManager::DoTraceStub(PCODE stubStartAddress,
         LOG((LF_CORDB, LL_EVERYTHING, "GPFEP about to be called in PSM::DoTraceStub with address %p\n", stubStartAddress - FixupPrecode::FixupCodeOffset));
         Precode* pPrecode = Precode::GetPrecodeFromEntryPoint(stubStartAddress - FixupPrecode::FixupCodeOffset, TRUE /* speculative */);
         LOG((LF_CORDB, LL_EVERYTHING, "PSM::DTS pPrecode %p\n", (void*)pPrecode));
-        //g_pPrecode
-        // LOG((LF_CORDB, LL_EVERYTHING, "Calling GetTarget earlier for fun.\n"));
-        PCODE target1 = (PCODE)NULL;
         if ((pPrecode == NULL) || (pPrecode->GetType() != PRECODE_FIXUP))
         {
             LOG((LF_CORDB, LL_EVERYTHING, "Precode::DTS had to go into if statement for precode defn:\n"));
@@ -1073,10 +1070,10 @@ BOOL PrecodeStubManager::DoTraceStub(PCODE stubStartAddress,
 
 #ifdef HAS_FIXUP_PRECODE
         case PRECODE_FIXUP:
-            LOG((LF_CORDB, LL_EVERYTHING, "PrecodeType PRECODE_FIXUP: %p\n", pPrecode));
-            LOG((LF_CORDB, LL_EVERYTHING, "Calling GetTarget earlier for fun.\n"));
-            target1 = pPrecode->GetTarget();
-            LOG((LF_CORDB, LL_EVERYTHING, "target: %p.\n", target1));
+            // LOG((LF_CORDB, LL_EVERYTHING, "PrecodeType PRECODE_FIXUP: %p\n", pPrecode));
+            // LOG((LF_CORDB, LL_EVERYTHING, "Calling GetTarget earlier for fun.\n"));
+            // target1 = pPrecode->GetTarget();
+            // LOG((LF_CORDB, LL_EVERYTHING, "target: %p.\n", target1));
             break;
 #endif // HAS_FIXUP_PRECODE
 

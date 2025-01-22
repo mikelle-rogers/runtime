@@ -2713,8 +2713,6 @@ extern "C" PCODE STDCALL PreStubWorker(TransitionBlock* pTransitionBlock, Method
             LOG((LF_CORDB, LL_EVERYTHING, "PreStubWorker g_preStubPatchTraceActiveCount: %d.\n", g_preStubPatchTraceActiveCount));
             if (g_preStubPatchTraceActiveCount > 0)
             {
-                PCODE target_temp = g_pPrecode->GetTarget();
-                LOG((LF_CORDB, LL_EVERYTHING, "PreStubWorker calling NextStep with address %p, precode target: %p.\n", pbRetVal, target_temp));
                 g_pDebugger->PreStubPatchNextStep(pbRetVal);
             }
         }

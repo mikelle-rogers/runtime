@@ -235,15 +235,8 @@ Precode* Precode::Allocate(PrecodeType t, MethodDesc* pMD,
 void Precode::Init(Precode* pPrecodeRX, PrecodeType t, MethodDesc* pMD, LoaderAllocator *pLoaderAllocator)
 {
     LIMITED_METHOD_CONTRACT;
-    g_fixupPrecodeCount += 1;
     LOG((LF_CORDB, LL_EVERYTHING, "count, this, pPrecodeRX: %d, %p, %p\n", g_fixupPrecodeCount, this, (PCODE)pPrecodeRX));
     LOG((LF_CORDB, LL_EVERYTHING, "P::I this, pPrecodeRX: %p, %p:\n", this, (void*)pPrecodeRX));
-    if (g_fixupPrecodeCount == 2086)
-    {
-        LOG((LF_CORDB, LL_EVERYTHING, "setting g_pPrecode to %p\n", this));
-        g_pPrecode = this;
-        // g_ppPrecode = this;
-    }
     switch (t) {
     case PRECODE_STUB:
         LOG((LF_CORDB, LL_EVERYTHING, "P::I PRECODE_STUB\n"));

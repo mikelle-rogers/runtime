@@ -148,8 +148,6 @@ GPTR_IMPL(EEDbgInterfaceImpl, g_pEEDbgInterfaceImpl);
 GVAL_IMPL_INIT(DWORD, g_multicastDelegateTraceActiveCount, 0);
 GVAL_IMPL_INIT(DWORD, g_externalMethodFixupTraceActiveCount, 0);
 GVAL_IMPL_INIT(DWORD, g_preStubPatchTraceActiveCount, 0);
-GVAL_IMPL_INIT(DWORD, g_fixupPrecodeCount, 0);
-GPTR_IMPL(Precode, g_pPrecode);
 #endif // DACCESS_COMPILE
 
 #endif // DEBUGGING_SUPPORTED
