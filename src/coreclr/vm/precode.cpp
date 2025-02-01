@@ -235,7 +235,6 @@ Precode* Precode::Allocate(PrecodeType t, MethodDesc* pMD,
 void Precode::Init(Precode* pPrecodeRX, PrecodeType t, MethodDesc* pMD, LoaderAllocator *pLoaderAllocator)
 {
     LIMITED_METHOD_CONTRACT;
-    LOG((LF_CORDB, LL_EVERYTHING, "count, this, pPrecodeRX: %d, %p, %p\n", g_fixupPrecodeCount, this, (PCODE)pPrecodeRX));
     LOG((LF_CORDB, LL_EVERYTHING, "P::I this, pPrecodeRX: %p, %p:\n", this, (void*)pPrecodeRX));
     switch (t) {
     case PRECODE_STUB:
@@ -530,7 +529,6 @@ void FixupPrecode::Init(FixupPrecode* pPrecodeRX, MethodDesc* pMD, LoaderAllocat
     pData->MethodDesc = pMD;
 
     _ASSERTE(GetMethodDesc() == (TADDR)pMD);
-    LOG((LF_CORDB, LL_EVERYTHING, "In fizup precode count, this, pPrecodeRX: %d, %p, %p\n", g_fixupPrecodeCount, this, (PCODE)pPrecodeRX));
     pData->Target = (PCODE)pPrecodeRX + FixupPrecode::FixupCodeOffset;
     LOG((LF_CORDB, LL_EVERYTHING, "Target in FP:I: %p\n", pData->Target));
     pData->PrecodeFixupThunk = GetPreStubEntryPoint();

@@ -5884,24 +5884,18 @@ static bool IsTailCall(const BYTE * ip, ControllerStackInfo* info, TailCallFunct
     }
 
     TraceDestination trace;
-    LOG((LF_CORDB, LL_INFO1000, "Before TraceStub\n" ));
     if (!g_pEEInterface->TraceStub(ip, &trace) || !g_pEEInterface->FollowTrace(&trace))
     {
-        LOG((LF_CORDB, LL_INFO1000, "Going to return False from TailCall\n" ));
         return false;
     }
-    LOG((LF_CORDB, LL_INFO1000, "After the if statement in TailCall\n" ));
-    LOG((LF_CORDB, LL_INFO1000, "The trace is of type: %s\n", GetTType(trace.GetTraceType()) ));
     if (trace.GetTraceType() == TRACE_PRE_STUB_PATCH)
     {
-        LOG((LF_CORDB, LL_INFO1000, "The trace type was prestubpatch, returning false.\n" ));
         return false;
     }
     MethodDesc* pTargetMD =
         trace.GetTraceType() == TRACE_UNJITTED_METHOD
         ? trace.GetMethodDesc()
         : g_pEEInterface->GetNativeCodeMethodDesc(trace.GetAddress());
-    LOG((LF_CORDB, LL_INFO1000, "After the method desc thing\n" ));
     if (type == TailCallFunctionType::StoreTailCallArgs)
     {
         return (pTargetMD && pTargetMD->IsDynamicMethod() && pTargetMD->AsDynamicMethodDesc()->GetILStubType() == DynamicMethodDesc::StubTailCallStoreArgs);

@@ -2590,7 +2590,6 @@ static PCODE PreStubWorker_Preemptive(
     // Make sure the method table is restored, and method instantiation if present
     pMD->CheckRestore();
     CONSISTENCY_CHECK(GetAppDomain()->CheckCanExecuteManagedCode(pMD));
-    LOG((LF_CORDB, LL_EVERYTHING, "PreStubWorker_Preemptive calling DoPrestub.\n"));
     pbRetVal = pMD->DoPrestub(NULL, CallerGCMode::Preemptive);
 
     UNINSTALL_UNWIND_AND_CONTINUE_HANDLER;
@@ -2602,7 +2601,6 @@ static PCODE PreStubWorker_Preemptive(
         // Give debugger opportunity to stop here
         if (g_preStubPatchTraceActiveCount > 0)
         {
-            LOG((LF_CORDB, LL_EVERYTHING, "PreStubWorker_Preemptive calling NextStep with address %p.\n", pbRetVal));
             g_pDebugger->PreStubPatchNextStep(pbRetVal);
         }
     }
@@ -2699,7 +2697,6 @@ extern "C" PCODE STDCALL PreStubWorker(TransitionBlock* pTransitionBlock, Method
 
         GCX_PREEMP_THREAD_EXISTS(CURRENT_THREAD);
         {
-            LOG((LF_CORDB, LL_EVERYTHING, "PreStubWorker Calling DoPreStub.\n"));
             pbRetVal = pMD->DoPrestub(pDispatchingMT, CallerGCMode::Coop);
         }
 
@@ -2710,7 +2707,6 @@ extern "C" PCODE STDCALL PreStubWorker(TransitionBlock* pTransitionBlock, Method
             HardwareExceptionHolder;
 
             // Give debugger opportunity to stop here
-            LOG((LF_CORDB, LL_EVERYTHING, "PreStubWorker g_preStubPatchTraceActiveCount: %d.\n", g_preStubPatchTraceActiveCount));
             if (g_preStubPatchTraceActiveCount > 0)
             {
                 g_pDebugger->PreStubPatchNextStep(pbRetVal);
