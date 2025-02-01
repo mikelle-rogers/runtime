@@ -5896,6 +5896,7 @@ static bool IsTailCall(const BYTE * ip, ControllerStackInfo* info, TailCallFunct
         trace.GetTraceType() == TRACE_UNJITTED_METHOD
         ? trace.GetMethodDesc()
         : g_pEEInterface->GetNativeCodeMethodDesc(trace.GetAddress());
+
     if (type == TailCallFunctionType::StoreTailCallArgs)
     {
         return (pTargetMD && pTargetMD->IsDynamicMethod() && pTargetMD->AsDynamicMethodDesc()->GetILStubType() == DynamicMethodDesc::StubTailCallStoreArgs);
@@ -7907,7 +7908,6 @@ void DebuggerStepper::TriggerPreStubPatch(PCODE target)
 {
     TraceDestination trace;
     FramePointer fp = LEAF_MOST_FRAME;
-    LOG((LF_CORDB, LL_EVERYTHING, "DebuggerStepper::TriggerPreStubPatch called with address %p\n", target));
     trace.InitForStub(target);
     g_pEEInterface->FollowTrace(&trace);
     //fStopInUnmanaged only matters for TRACE_UNMANAGED

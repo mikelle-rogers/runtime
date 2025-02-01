@@ -145,7 +145,6 @@ PCODE MethodDesc::DoBackpatch(MethodTable * pMT, MethodTable *pDispatchingMT, BO
             }
 
             // Patch the fake entrypoint if necessary
-            LOG((LF_CORDB, LL_EVERYTHING, "Patch the fake entrypoint if necessary\n"));
             Precode::GetPrecodeFromEntryPoint(pExpected)->SetTargetInterlocked(pTarget);
         }
 
@@ -2886,7 +2885,7 @@ PCODE MethodDesc::DoPrestub(MethodTable *pDispatchingMT, CallerGCMode callerGCMo
 
     if (!IsPointingToPrestub())
     {
-        LOG((LF_CORDB, LL_EVERYTHING,
+        LOG((LF_CLASSLOADER, LL_INFO1000,
             "    In PreStubWorker, method already jitted, backpatching call point\n"));
         #if defined(FEATURE_JIT_PITCHING)
             MarkMethodNotPitchingCandidate(this);
@@ -3010,7 +3009,7 @@ PCODE MethodDesc::DoPrestub(MethodTable *pDispatchingMT, CallerGCMode callerGCMo
             pStub->DecRef();
         }
     }
-    LOG((LF_CORDB, LL_EVERYTHING, "MethodDesc::DoPrestub\n"));
+
     _ASSERTE(!IsPointingToPrestub());
     _ASSERTE(HasStableEntryPoint());
 

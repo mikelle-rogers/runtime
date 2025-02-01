@@ -2340,7 +2340,7 @@ BOOL MethodDesc::IsPointingToPrestub()
 
     if (!HasPrecode())
         return FALSE;
-    LOG((LF_CORDB, LL_EVERYTHING, "MethodDesc::IsPointingToPrestu\n"));
+    
     return GetPrecode()->IsPointingToPrestub();
 }
 
@@ -2603,7 +2603,6 @@ MethodDesc* MethodDesc::GetMethodDescFromStubAddr(PCODE addr, BOOL fSpeculative 
 
     // Otherwise this must be some kind of precode
     //
-    LOG((LF_CORDB, LL_EVERYTHING, "GetMethodDescFromStubAddr\n"));
     PTR_Precode pPrecode = Precode::GetPrecodeFromEntryPoint(addr, fSpeculative);
     PREFIX_ASSUME(fSpeculative || (pPrecode != NULL));
     if (pPrecode != NULL)

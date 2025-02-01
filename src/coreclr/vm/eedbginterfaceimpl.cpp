@@ -430,7 +430,7 @@ MethodDesc *EEDbgInterfaceImpl::GetNativeCodeMethodDesc(const PCODE address)
         POSTCONDITION(CheckPointer(RETVAL, NULL_OK));
     }
     CONTRACT_END;
-    LOG((LF_CORDB, LL_INFO1000, "Inside GetNativeCodeMethodDesc, address: %p\n", address));
+
     RETURN ExecutionManager::GetCodeMethodDesc(address);
 }
 

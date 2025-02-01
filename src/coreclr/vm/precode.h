@@ -173,7 +173,6 @@ struct StubPrecode
         CONTRACTL_END;
 
         StubPrecodeData *pData = GetData();
-        LOG((LF_CORDB, LL_EVERYTHING, "SetTargetInterlocked,this, target: %p, %p\n", this, pData->Target));
         return InterlockedCompareExchangeT<PCODE>(&pData->Target, (PCODE)target, (PCODE)expected) == expected;
   }
 
@@ -268,10 +267,7 @@ struct FixupPrecode
     PTR_FixupPrecodeData GetData() const
     {
         LIMITED_METHOD_CONTRACT;
-        PTR_FixupPrecodeData p = dac_cast<PTR_FixupPrecodeData>(dac_cast<TADDR>(this) + GetStubCodePageSize());
-        LOG((LF_CORDB, LL_EVERYTHING, "p, this, Target, Methoddesc, : %p, %p, %p, %p\n", (void*)p, this, p->Target, p->MethodDesc));
-        return p;
-        // return dac_cast<PTR_FixupPrecodeData>(dac_cast<TADDR>(this) + GetStubCodePageSize());
+        return dac_cast<PTR_FixupPrecodeData>(dac_cast<TADDR>(this) + GetStubCodePageSize());
     }
 
     TADDR GetMethodDesc()
@@ -523,9 +519,7 @@ public:
     BOOL IsPointingToPrestub()
     {
         WRAPPER_NO_CONTRACT;
-        PCODE target = GetTarget();
-        LOG((LF_CORDB, LL_EVERYTHING, "IPTP: this, target: %p, %p\n", this, target));
-        return IsPointingToPrestub(target);
+        return IsPointingToPrestub(GetTarget());
     }
 
     PCODE GetEntryPoint()
@@ -553,7 +547,6 @@ public:
     static PTR_Precode GetPrecodeFromEntryPoint(PCODE addr, BOOL fSpeculative = FALSE)
     {
         LIMITED_METHOD_DAC_CONTRACT;
-        LOG((LF_CORDB, LL_EVERYTHING, "GetPrecodeFromEntryPoint with addr: %p\n", addr));
 
 #ifdef DACCESS_COMPILE
         // Always use speculative checks with DAC
@@ -561,15 +554,11 @@ public:
 #endif
 
         TADDR pInstr = PCODEToPINSTR(addr);
-        LOG((LF_CORDB, LL_EVERYTHING, "pInstr is addr: %p\n", pInstr));
+    
         // Always do consistency check in debug
         if (fSpeculative INDEBUG(|| TRUE))
         {
-            //if (!IS_ALIGNED(pInstr, PRECODE_ALIGNMENT) || !IsValidType(PTR_Precode(pInstr)->GetType()))
-            bool not_isAligned = !IS_ALIGNED(pInstr, PRECODE_ALIGNMENT);
-            bool not_isValidType = !IsValidType(PTR_Precode(pInstr)->GetType());
-            LOG((LF_CORDB, LL_EVERYTHING, "not_isAligned: %d, not_isValidType: %d, precode_alignment: %zu\n", not_isAligned, not_isValidType, PRECODE_ALIGNMENT));
-            if (not_isAligned || not_isValidType)
+            if (!IS_ALIGNED(pInstr, PRECODE_ALIGNMENT) || !IsValidType(PTR_Precode(pInstr)->GetType()))
             {
                 if (fSpeculative) return NULL;
                 _ASSERTE(!"Precode::GetPrecodeFromEntryPoint: Unexpected code in precode");
@@ -577,7 +566,6 @@ public:
         }
 
         PTR_Precode pPrecode = PTR_Precode(pInstr);
-        LOG((LF_CORDB, LL_EVERYTHING, "pPrecode value: %p\n", (void*)pPrecode));
         return pPrecode;
     }
 

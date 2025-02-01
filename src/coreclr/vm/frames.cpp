@@ -559,7 +559,7 @@ BOOL PrestubMethodFrame::TraceFrame(Thread *thread, BOOL fromPatch,
 
     if (fromPatch)
     {
-        LOG((LF_CORDB, LL_EVERYTHING, "PrestubMethodFrame::TraceFrame will we need to figure out race conditions?\n"));
+
         // In between the time where the Prestub read the method entry point from the slot and the time it reached
         // ThePrestubPatchLabel, GetMethodEntryPoint() could have been updated due to code versioning. This will result in the
         // debugger getting some version of the code or the prestub, but not necessarily the exact code pointer that winds up
@@ -571,7 +571,6 @@ BOOL PrestubMethodFrame::TraceFrame(Thread *thread, BOOL fromPatch,
     }
     else
     {
-        LOG((LF_CORDB, LL_EVERYTHING, "PrestubMethodFrame::TraceFrame prestubpatch? with null addr\n"));
         trace->InitForPreStubPatch();
     }
 
